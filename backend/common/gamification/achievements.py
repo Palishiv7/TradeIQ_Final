@@ -1,0 +1,480 @@
+"""
+Gamification Achievement Definitions
+
+This module defines all achievements available in the system.
+Achievements are organized by categories and include metadata such as:
+- Name and description
+- Rarity and XP rewards
+- Unlock criteria
+- Whether the achievement is hidden until unlocked
+"""
+
+from typing import Dict, Any, List
+from backend.common.gamification.models import Achievement, AchievementRarity
+
+# Achievement categories
+CATEGORY_GENERAL = "general"
+CATEGORY_QUESTION = "question"
+CATEGORY_ASSESSMENT = "assessment"
+CATEGORY_STREAK = "streak"
+CATEGORY_SPECIAL = "special"
+CATEGORY_PATTERN = "pattern"
+
+# Achievement icons (just names, would map to actual assets)
+ICON_STAR = "star"
+ICON_MEDAL = "medal"
+ICON_TROPHY = "trophy"
+ICON_BADGE = "badge"
+ICON_FLAME = "flame"
+ICON_BOOK = "book"
+ICON_CHART = "chart"
+ICON_CANDLESTICK = "candlestick"
+ICON_ROCKET = "rocket"
+ICON_BRAIN = "brain"
+
+
+def get_default_achievements() -> Dict[str, Achievement]:
+    """
+    Get the default set of achievements.
+    
+    Returns:
+        Dictionary mapping achievement IDs to Achievement objects
+    """
+    achievements = {}
+    
+    # General Achievements
+    achievements.update({
+        "first_login": Achievement(
+            id="first_login",
+            name="First Steps",
+            description="Log in to the TradeIQ platform for the first time.",
+            rarity=AchievementRarity.COMMON,
+            category=CATEGORY_GENERAL,
+            icon=ICON_STAR,
+            is_hidden=False,
+            criteria={"action": "login", "count": 1},
+            xp_reward=10
+        ),
+        "week_streak": Achievement(
+            id="week_streak",
+            name="Weekly Warrior",
+            description="Log in for 7 consecutive days.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_STREAK,
+            icon=ICON_FLAME,
+            is_hidden=False,
+            criteria={"action": "login_streak", "days": 7},
+            xp_reward=50
+        ),
+        "month_streak": Achievement(
+            id="month_streak",
+            name="Persistent Trader",
+            description="Log in for 30 consecutive days.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_STREAK,
+            icon=ICON_FLAME,
+            is_hidden=False,
+            criteria={"action": "login_streak", "days": 30},
+            xp_reward=200
+        ),
+        "profile_complete": Achievement(
+            id="profile_complete",
+            name="Identity Established",
+            description="Complete your user profile.",
+            rarity=AchievementRarity.COMMON,
+            category=CATEGORY_GENERAL,
+            icon=ICON_BADGE,
+            is_hidden=False,
+            criteria={"action": "profile_complete"},
+            xp_reward=20
+        )
+    })
+    
+    # Question Achievements
+    achievements.update({
+        "questions_answered": Achievement(
+            id="questions_answered",
+            name="Question Seeker",
+            description="Answer 50 questions.",
+            rarity=AchievementRarity.COMMON,
+            category=CATEGORY_QUESTION,
+            icon=ICON_BOOK,
+            is_hidden=False,
+            criteria={"action": "answer_question", "target_count": 50},
+            xp_reward=50
+        ),
+        "questions_answered_100": Achievement(
+            id="questions_answered_100",
+            name="Question Master",
+            description="Answer 100 questions.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_QUESTION,
+            icon=ICON_BOOK,
+            is_hidden=False,
+            criteria={"action": "answer_question", "target_count": 100},
+            xp_reward=100
+        ),
+        "questions_answered_500": Achievement(
+            id="questions_answered_500",
+            name="Question Virtuoso",
+            description="Answer 500 questions.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_QUESTION,
+            icon=ICON_BOOK,
+            is_hidden=False,
+            criteria={"action": "answer_question", "target_count": 500},
+            xp_reward=250
+        ),
+        "correct_answers": Achievement(
+            id="correct_answers",
+            name="Sharp Mind",
+            description="Answer 25 questions correctly.",
+            rarity=AchievementRarity.COMMON,
+            category=CATEGORY_QUESTION,
+            icon=ICON_BRAIN,
+            is_hidden=False,
+            criteria={"action": "answer_correctly", "target_count": 25},
+            xp_reward=50
+        ),
+        "correct_answers_100": Achievement(
+            id="correct_answers_100",
+            name="Knowledge Keeper",
+            description="Answer 100 questions correctly.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_QUESTION,
+            icon=ICON_BRAIN,
+            is_hidden=False,
+            criteria={"action": "answer_correctly", "target_count": 100},
+            xp_reward=150
+        ),
+        "master_hard_questions": Achievement(
+            id="master_hard_questions",
+            name="Challenge Acceptor",
+            description="Answer 10 hard questions correctly.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_QUESTION,
+            icon=ICON_MEDAL,
+            is_hidden=False,
+            criteria={"action": "answer_hard_correctly", "target_count": 10},
+            xp_reward=100
+        ),
+        "master_very_hard_questions": Achievement(
+            id="master_very_hard_questions",
+            name="Difficulty Destroyer",
+            description="Answer 10 very hard questions correctly.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_QUESTION,
+            icon=ICON_TROPHY,
+            is_hidden=False,
+            criteria={"action": "answer_very_hard_correctly", "target_count": 10},
+            xp_reward=200
+        ),
+        "speed_demon": Achievement(
+            id="speed_demon",
+            name="Lightning Fast",
+            description="Answer 5 questions correctly in under 5 seconds each.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_QUESTION,
+            icon=ICON_ROCKET,
+            is_hidden=False,
+            criteria={"action": "fast_answer", "target_count": 5, "time_ms": 5000},
+            xp_reward=75
+        ),
+        "perfect_streak_5": Achievement(
+            id="perfect_streak_5",
+            name="Rising Star",
+            description="Answer 5 questions correctly in a row.",
+            rarity=AchievementRarity.COMMON,
+            category=CATEGORY_STREAK,
+            icon=ICON_FLAME,
+            is_hidden=False,
+            criteria={"action": "correct_streak", "count": 5},
+            xp_reward=50
+        ),
+        "perfect_streak_10": Achievement(
+            id="perfect_streak_10",
+            name="Unstoppable",
+            description="Answer 10 questions correctly in a row.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_STREAK,
+            icon=ICON_FLAME,
+            is_hidden=False,
+            criteria={"action": "correct_streak", "count": 10},
+            xp_reward=100
+        ),
+        "perfect_streak_25": Achievement(
+            id="perfect_streak_25",
+            name="Trading Prodigy",
+            description="Answer 25 questions correctly in a row.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_STREAK,
+            icon=ICON_FLAME,
+            is_hidden=False,
+            criteria={"action": "correct_streak", "count": 25},
+            xp_reward=250
+        ),
+    })
+    
+    # Assessment Achievements
+    achievements.update({
+        "assessments_completed": Achievement(
+            id="assessments_completed",
+            name="Assessment Explorer",
+            description="Complete 5 assessments.",
+            rarity=AchievementRarity.COMMON,
+            category=CATEGORY_ASSESSMENT,
+            icon=ICON_CHART,
+            is_hidden=False,
+            criteria={"action": "complete_assessment", "target_count": 5},
+            xp_reward=75
+        ),
+        "assessments_completed_25": Achievement(
+            id="assessments_completed_25",
+            name="Assessment Enthusiast",
+            description="Complete 25 assessments.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_ASSESSMENT,
+            icon=ICON_CHART,
+            is_hidden=False,
+            criteria={"action": "complete_assessment", "target_count": 25},
+            xp_reward=150
+        ),
+        "perfect_assessments": Achievement(
+            id="perfect_assessments",
+            name="Perfect Score",
+            description="Complete an assessment with a perfect score.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_ASSESSMENT,
+            icon=ICON_TROPHY,
+            is_hidden=False,
+            criteria={"action": "perfect_assessment", "target_count": 1},
+            xp_reward=100
+        ),
+        "perfect_assessments_5": Achievement(
+            id="perfect_assessments_5",
+            name="Perfection Streak",
+            description="Complete 5 assessments with perfect scores.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_ASSESSMENT,
+            icon=ICON_TROPHY,
+            is_hidden=False,
+            criteria={"action": "perfect_assessment", "target_count": 5},
+            xp_reward=250
+        ),
+        "candlestick_specialist": Achievement(
+            id="candlestick_specialist",
+            name="Candlestick Specialist",
+            description="Complete 10 candlestick pattern assessments.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_PATTERN,
+            icon=ICON_CANDLESTICK,
+            is_hidden=False,
+            criteria={"action": "complete_assessment_type", "type": "candlestick", "target_count": 10},
+            xp_reward=125
+        ),
+        "technical_specialist": Achievement(
+            id="technical_specialist",
+            name="Technical Analysis Specialist",
+            description="Complete 10 technical analysis assessments.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_ASSESSMENT,
+            icon=ICON_CHART,
+            is_hidden=False,
+            criteria={"action": "complete_assessment_type", "type": "technical", "target_count": 10},
+            xp_reward=125
+        ),
+        "leaderboard_rank_1": Achievement(
+            id="leaderboard_rank_1",
+            name="Top Trader",
+            description="Reach the #1 position on any weekly leaderboard.",
+            rarity=AchievementRarity.EPIC,
+            category=CATEGORY_SPECIAL,
+            icon=ICON_TROPHY,
+            is_hidden=False,
+            criteria={"action": "leaderboard_rank", "rank": 1, "type": "weekly"},
+            xp_reward=500
+        ),
+        "leaderboard_top_10": Achievement(
+            id="leaderboard_top_10",
+            name="Elite Trader Circle",
+            description="Reach the top 10 on any weekly leaderboard.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_SPECIAL,
+            icon=ICON_MEDAL,
+            is_hidden=False,
+            criteria={"action": "leaderboard_rank", "rank": 10, "type": "weekly"},
+            xp_reward=200
+        ),
+    })
+    
+    # Pattern-specific achievements
+    achievements.update({
+        "pattern_master_doji": Achievement(
+            id="pattern_master_doji",
+            name="Doji Master",
+            description="Correctly identify 15 Doji patterns.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_PATTERN,
+            icon=ICON_CANDLESTICK,
+            is_hidden=False,
+            criteria={"action": "identify_pattern", "pattern": "doji", "target_count": 15},
+            xp_reward=100
+        ),
+        "pattern_master_engulfing": Achievement(
+            id="pattern_master_engulfing",
+            name="Engulfing Pattern Specialist",
+            description="Correctly identify 15 Bullish or Bearish Engulfing patterns.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_PATTERN,
+            icon=ICON_CANDLESTICK,
+            is_hidden=False,
+            criteria={"action": "identify_pattern", "pattern": "engulfing", "target_count": 15},
+            xp_reward=100
+        ),
+        "pattern_master_hammer": Achievement(
+            id="pattern_master_hammer",
+            name="Hammer Time",
+            description="Correctly identify 15 Hammer or Inverted Hammer patterns.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_PATTERN,
+            icon=ICON_CANDLESTICK,
+            is_hidden=False,
+            criteria={"action": "identify_pattern", "pattern": "hammer", "target_count": 15},
+            xp_reward=100
+        ),
+        "pattern_master_star": Achievement(
+            id="pattern_master_star",
+            name="Star Gazer",
+            description="Correctly identify 15 Morning or Evening Star patterns.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_PATTERN,
+            icon=ICON_CANDLESTICK,
+            is_hidden=False,
+            criteria={"action": "identify_pattern", "pattern": "star", "target_count": 15},
+            xp_reward=150
+        ),
+        "pattern_master_harami": Achievement(
+            id="pattern_master_harami",
+            name="Harami Expert",
+            description="Correctly identify 15 Harami patterns.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_PATTERN,
+            icon=ICON_CANDLESTICK,
+            is_hidden=False,
+            criteria={"action": "identify_pattern", "pattern": "harami", "target_count": 15},
+            xp_reward=100
+        ),
+    })
+    
+    # Hidden achievements for extra surprise
+    achievements.update({
+        "night_owl": Achievement(
+            id="night_owl",
+            name="Night Owl",
+            description="Complete an assessment between midnight and 4 AM local time.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_SPECIAL,
+            icon=ICON_BADGE,
+            is_hidden=True,
+            criteria={"action": "time_of_day", "start_hour": 0, "end_hour": 4},
+            xp_reward=50
+        ),
+        "weekend_warrior": Achievement(
+            id="weekend_warrior",
+            name="Weekend Warrior",
+            description="Complete assessments on 5 consecutive weekends.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_STREAK,
+            icon=ICON_BADGE,
+            is_hidden=True,
+            criteria={"action": "weekend_streak", "count": 5},
+            xp_reward=150
+        ),
+        "comeback_king": Achievement(
+            id="comeback_king",
+            name="Comeback King",
+            description="Improve your assessment score by at least 50% compared to your previous attempt.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_SPECIAL,
+            icon=ICON_MEDAL,
+            is_hidden=True,
+            criteria={"action": "score_improvement", "percent": 50},
+            xp_reward=75
+        ),
+        "all_patterns": Achievement(
+            id="all_patterns",
+            name="Pattern Encyclopedia",
+            description="Correctly identify at least one of each candlestick pattern in the system.",
+            rarity=AchievementRarity.EPIC,
+            category=CATEGORY_PATTERN,
+            icon=ICON_TROPHY,
+            is_hidden=True,
+            criteria={"action": "identify_all_patterns"},
+            xp_reward=300
+        ),
+        "level_10": Achievement(
+            id="level_10",
+            name="Trading Apprentice",
+            description="Reach level 10.",
+            rarity=AchievementRarity.UNCOMMON,
+            category=CATEGORY_GENERAL,
+            icon=ICON_STAR,
+            is_hidden=False,
+            criteria={"action": "reach_level", "level": 10},
+            xp_reward=100
+        ),
+        "level_25": Achievement(
+            id="level_25",
+            name="Trading Professional",
+            description="Reach level 25.",
+            rarity=AchievementRarity.RARE,
+            category=CATEGORY_GENERAL,
+            icon=ICON_STAR,
+            is_hidden=False,
+            criteria={"action": "reach_level", "level": 25},
+            xp_reward=250
+        ),
+        "level_50": Achievement(
+            id="level_50",
+            name="Trading Master",
+            description="Reach level 50.",
+            rarity=AchievementRarity.EPIC,
+            category=CATEGORY_GENERAL,
+            icon=ICON_TROPHY,
+            is_hidden=False,
+            criteria={"action": "reach_level", "level": 50},
+            xp_reward=500
+        ),
+        "level_100": Achievement(
+            id="level_100",
+            name="Trading Legend",
+            description="Reach level 100.",
+            rarity=AchievementRarity.LEGENDARY,
+            category=CATEGORY_GENERAL,
+            icon=ICON_TROPHY,
+            is_hidden=False,
+            criteria={"action": "reach_level", "level": 100},
+            xp_reward=1000
+        ),
+    })
+    
+    return achievements
+
+
+def get_achievements_by_category() -> Dict[str, List[str]]:
+    """
+    Get achievement IDs organized by category.
+    
+    Returns:
+        Dictionary mapping categories to lists of achievement IDs
+    """
+    achievements = get_default_achievements()
+    categories = {}
+    
+    for achievement_id, achievement in achievements.items():
+        category = achievement.category
+        if category not in categories:
+            categories[category] = []
+        categories[category].append(achievement_id)
+    
+    return categories 

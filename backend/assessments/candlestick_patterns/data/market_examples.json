@@ -1,0 +1,26 @@
+{
+  "doji": [
+    {
+      "symbol": "AAPL",
+      "date": "2022-05-15",
+      "description": "Classic doji showing market indecision after an uptrend in Apple stock",
+      "outcome": "Followed by a short-term reversal"
+    }
+  ],
+  "hammer": [
+    {
+      "symbol": "MSFT",
+      "date": "2022-03-20",
+      "description": "Bullish hammer at support level for Microsoft stock",
+      "outcome": "Started a 15% rally over the next two weeks"
+    }
+  ],
+  "bullish_engulfing": [
+    {
+      "symbol": "SPY",
+      "date": "2022-01-24",
+      "description": "Strong bullish engulfing pattern at market bottom for S&P 500 ETF",
+      "outcome": "Marked the beginning of a recovery rally"
+    }
+  ]
+}

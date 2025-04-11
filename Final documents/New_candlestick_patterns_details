@@ -1,0 +1,3104 @@
+# TradeIQ Candlestick Pattern Assessment Module
+
+## Overview
+
+The Candlestick Pattern Assessment module is a core component of the TradeIQ platform, designed to test and improve users' ability to recognize and understand candlestick patterns in financial charts. This assessment is fundamental to trader education as candlestick pattern recognition is a critical skill in technical analysis and trading.
+
+This document provides a comprehensive guide to the module's architecture, implementation, and integration points within the TradeIQ ecosystem.
+
+## Key Implementation Files
+
+### 1. Utility System (`candlestick_utils.py`)
+
+The `candlestick_utils.py` file serves as a critical utility module that provides specialized functions for candlestick pattern generation, recognition, and visualization. This file contains no business logic but instead focuses on technical operations that support the assessment process.
+
+#### Primary Responsibilities:
+
+1. **Pattern Management**
+   - Defining and categorizing candlestick patterns
+   - Retrieving patterns based on difficulty levels
+   - Providing pattern metadata (descriptions, reliability, etc.)
+
+2. **Chart Generation**
+   - Creating visual representations of candlestick patterns
+   - Generating realistic market data for assessment questions
+   - Rendering charts with appropriate styling and formatting
+
+3. **Answer Option Generation**
+   - Creating plausible distractor options for multiple-choice questions
+   - Balancing option difficulty based on pattern similarity
+   - Ensuring appropriate diversity in answer choices
+
+#### Key Functions:
+
+```python
+def get_patterns_by_difficulty(difficulty: Difficulty) -> List[Dict[str, Any]]:
+    """
+    Get a list of patterns appropriate for a specific difficulty level.
+    
+    Args:
+        difficulty: The difficulty level to filter patterns
+        
+    Returns:
+        List of pattern dictionaries with names, descriptions, and metadata
+    """
+    patterns_by_difficulty = {
+        Difficulty.BEGINNER: BEGINNER_PATTERNS,
+        Difficulty.INTERMEDIATE: INTERMEDIATE_PATTERNS,
+        Difficulty.ADVANCED: ADVANCED_PATTERNS
+    }
+    return patterns_by_difficulty.get(difficulty, INTERMEDIATE_PATTERNS)
+
+
+def generate_candlestick_chart(
+    pattern_name: str,
+    candle_count: int = 30,
+    highlight_pattern: bool = True,
+    seed: Optional[int] = None
+) -> Tuple[np.ndarray, List[Candle]]:
+    """
+    Generate a candlestick chart image for a specific pattern.
+    
+    Args:
+        pattern_name: Name of the candlestick pattern to generate
+        candle_count: Total number of candles to include in the chart
+        highlight_pattern: Whether to highlight the pattern candles
+        seed: Random seed for reproducible generation
+        
+    Returns:
+        Tuple containing (chart image as numpy array, list of Candle objects)
+    """
+    # Implementation includes:
+    # 1. Pattern-specific candle generation
+    # 2. Matplotlib rendering with mplfinance
+    # 3. Image transformation for model input
+    # 4. Appropriate styling based on user preferences
+
+
+@lru_cache(maxsize=128)
+def get_pattern_description(pattern_name: str) -> str:
+    """
+    Get a detailed description of a candlestick pattern.
+    Cached for performance.
+    
+    Args:
+        pattern_name: Name of the pattern
+        
+    Returns:
+        Detailed description string
+    """
+    return PATTERN_DESCRIPTIONS.get(
+        pattern_name, 
+        "Description not available for this pattern."
+    )
+
+
+def generate_options(
+    correct_pattern: str,
+    count: int = 4,
+    difficulty: Difficulty = Difficulty.INTERMEDIATE
+) -> List[str]:
+    """
+    Generate multiple choice options for a question.
+    
+    Args:
+        correct_pattern: The correct pattern name
+        count: Number of options to generate
+        difficulty: Difficulty level affecting distractor selection
+        
+    Returns:
+        List of pattern names including the correct one
+    """
+    # Implementation includes:
+    # 1. Selection of appropriate distractors based on difficulty
+    # 2. For beginner: visually distinct patterns
+    # 3. For intermediate: mix of similar and distinct patterns
+    # 4. For advanced: highly similar patterns
+    # 5. Randomization and positioning
+```
+
+#### Technical Details:
+
+The utilities file implements several advanced techniques:
+
+1. **Memory Optimization**
+   - Uses `lru_cache` for expensive operations like chart generation
+   - Implements singleton pattern for pattern definitions
+   - Efficiently manages matplotlib resources
+
+2. **Randomization Control**
+   - Provides seeded random generation for reproducible results
+   - Ensures appropriate variation in pattern presentation
+   - Maintains difficulty consistency across sessions
+
+3. **Visualization Techniques**
+   - Uses mplfinance for financial chart rendering
+   - Implements custom styling based on user preferences
+   - Provides highlighting capabilities for educational purposes
+
+4. **Pattern Configuration**
+   - Maintains comprehensive pattern definitions
+   - Maps patterns to appropriate difficulty levels
+   - Provides detailed educational descriptions
+
+### 2. Service Implementation (`candlestick_service.py`)
+
+The `candlestick_service.py` file is the core business logic implementation for the candlestick pattern assessment module. The file has been significantly enhanced with improved type safety, caching mechanisms, error handling, and comprehensive method implementations.
+
+#### Core Class: CandlestickService
+
+This class handles all assessment operations and implements the assessment service interface:
+
+```python
+class CandlestickService(AssessmentServiceBase, Generic[Q, S]):
+    """
+    Service implementation for candlestick pattern assessments.
+    
+    This service handles the complete lifecycle of assessment sessions,
+    including creation, question management, answer evaluation, and
+    performance tracking.
+    """
+    
+    def __init__(
+        self,
+        question_repository: Repository[Q],
+        session_repository: Repository[S],
+        assessment_repository: Any,
+        question_generator: Any,
+        answer_evaluator: Any,
+        explanation_generator: Any,
+        event_dispatcher: EventDispatcher
+    ):
+        """Initialize with required dependencies."""
+        self.question_repository = question_repository
+        self.session_repository = session_repository
+        self.assessment_repository = assessment_repository
+        self.question_generator = question_generator
+        self.answer_evaluator = answer_evaluator
+        self.explanation_generator = explanation_generator
+        self.event_dispatcher = event_dispatcher
+        
+        # Optional dependencies set via properties
+        self._user_metrics_service = None
+        self._preferences_repository = None
+        
+        logger.info("CandlestickService initialized with dependencies")
+```
+
+#### Key Method Groups:
+
+1. **Session Management**
+
+Methods for creating, retrieving, and managing assessment sessions:
+
+```python
+async def create_session(
+    self,
+    user_id: str,
+    question_count: int = 10,
+    difficulty: Difficulty = Difficulty.INTERMEDIATE,
+    topics: Optional[List[str]] = None
+) -> S:
+    """Create a new candlestick pattern assessment session."""
+    # Input validation
+    if not user_id:
+        raise ValueError("User ID is required")
+    
+    # Generate session ID
+    session_id = str(uuid.uuid4())
+    
+    try:
+        # Generate questions
+        questions = await self.question_generator.generate_questions(
+            count=question_count,
+            difficulty=difficulty,
+            topics=topics
+        )
+        
+        # Create and save session
+        session = CandlestickSession(
+            id=session_id,
+            user_id=user_id,
+            assessment_type=AssessmentType.CANDLESTICK_PATTERNS,
+            questions=[q.id for q in questions],
+            difficulty=difficulty,
+            created_at=datetime.datetime.utcnow(),
+            status=SessionStatus.IN_PROGRESS
+        )
+        
+        await self.session_repository.save(session)
+        
+        # Save questions
+        for question in questions:
+            await self.question_repository.save(question)
+        
+        return session
+    except Exception as e:
+        logger.error(f"Error creating session: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to create session: {e}")
+
+
+async def get_session(self, session_id: str) -> Optional[S]:
+    """
+    Retrieve a session by its ID.
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        Session object if found, None otherwise
+    """
+    try:
+        return await self.session_repository.get_by_id(session_id)
+    except RepositoryError as e:
+        logger.error(f"Repository error retrieving session {session_id}: {e}", exc_info=True)
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving session {session_id}: {e}", exc_info=True)
+        return None
+```
+
+2. **Question and Answer Processing**
+
+Methods for managing questions and evaluating answers:
+
+```python
+async def get_question(self, question_id: str) -> Optional[Q]:
+    """
+    Retrieve a question by its ID.
+    
+    Args:
+        question_id: Question identifier
+        
+    Returns:
+        Question object if found, None otherwise
+    """
+    try:
+        return await self.question_repository.get_by_id(question_id)
+    except Exception as e:
+        logger.error(f"Error retrieving question {question_id}: {e}", exc_info=True)
+        return None
+
+
+async def submit_answer(
+    self,
+    session_id: str,
+    question_id: str,
+    answer: Any,
+    time_taken_ms: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Submit an answer for a question within a session.
+    
+    Args:
+        session_id: Session identifier
+        question_id: Question identifier
+        answer: User's answer
+        time_taken_ms: Optional time taken in milliseconds
+        
+    Returns:
+        Dictionary containing evaluation results and next question info
+        
+    Raises:
+        ValueError: If the session or question is not found or invalid
+        RuntimeError: If there's an error updating the session
+    """
+    # Retrieve session
+    session = await self.get_session(session_id)
+    if not session:
+        logger.error(f"submit_answer failed: Session {session_id} not found")
+        raise ValueError(f"Session {session_id} not found")
+    if session.status != SessionStatus.IN_PROGRESS:
+        logger.error(f"submit_answer failed: Session {session_id} is not in progress (status: {session.status.value})")
+        raise ValueError(f"Session {session_id} is not active.")
+
+    # Validate question ID belongs to session
+    if question_id not in session.questions:
+        logger.error(f"submit_answer failed: Question {question_id} not part of session {session_id}")
+        raise ValueError(f"Question {question_id} not found in session {session_id}")
+            
+    # ... additional implementation details ...
+    
+    # If session is now completed, perform completion tasks
+    if session.status == SessionStatus.COMPLETED:
+        # ... completion logic with safe event dispatching ...
+        
+        # Update user aggregate metrics with proper error handling
+        try:
+            logger.info(f"Attempting to update aggregate metrics for user {session.user_id}...")
+            metrics_updated = await self.user_metrics_service.update_metrics_from_session(session)
+            if metrics_updated:
+                logger.info(f"Aggregate metrics updated successfully for user {session.user_id}.")
+            else:
+                logger.warning(f"Aggregate metrics update returned False for user {session.user_id}.")
+        except Exception as metrics_err:
+            # Log error but don't fail the entire request because metrics failed
+            logger.error(f"Error updating user aggregate metrics for user {session.user_id} from session {session.id}: {metrics_err}", exc_info=True)
+            
+    # ... prepare and return response ...
+```
+
+3. **Performance Analysis**
+
+Methods for retrieving and analyzing user performance:
+
+```python
+@cached(ttl=300, key_builder=lambda self, user_id: f"user_stats:{user_id}")
+async def get_user_stats(self, user_id: str) -> Dict[str, Any]:
+    """
+    Get comprehensive statistics about a user's performance.
+    
+    Args:
+        user_id: User identifier
+        
+    Returns:
+        Dictionary with aggregated statistics
+    """
+    # ... Comprehensive implementation with:
+    # - User metrics retrieval
+    # - Session analysis
+    # - Pattern proficiency calculation
+    # - Difficulty breakdown
+    # - Streak tracking
+
+
+@cached(ttl=300, key_builder=lambda self, user_id, topic: f"topic_perf:{user_id}:{topic}")
+async def get_topic_performance(self, user_id: str, topic: str) -> Dict[str, Any]:
+    """
+    Get user performance for a specific topic/pattern.
+    
+    Args:
+        user_id: User identifier
+        topic: Topic/pattern name
+        
+    Returns:
+        Dictionary with performance data
+    """
+    # ... Implementation retrieving pattern-specific performance
+```
+
+4. **Session Results**
+
+Methods for retrieving and analyzing session results:
+
+```python
+async def get_session_performance(self, session_id: str) -> Dict[str, Any]:
+    """
+    Get detailed performance statistics for a specific session.
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        Dictionary with performance data
+    """
+    # ... Detailed session analysis with comprehensive metrics
+
+
+@cached(ttl=300, key_builder=lambda self, user_id, limit: f"recent_sessions:{user_id}:{limit}")
+async def get_recent_sessions(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Get a user's most recent assessment sessions with summary data.
+    
+    Args:
+        user_id: User identifier
+        limit: Maximum number of sessions to return
+        
+    Returns:
+        List of session summary dictionaries
+    """
+    # ... Implementation retrieving and summarizing recent sessions
+```
+
+5. **Pattern Information**
+
+Methods for retrieving pattern information:
+
+```python
+async def list_available_patterns(self) -> List[Dict[str, Any]]:
+    """
+    Get a list of all available candlestick patterns with descriptions.
+    
+    Returns:
+        List of pattern dictionaries with name, description, and difficulty
+    """
+    # ... Implementation retrieving comprehensive pattern data
+
+
+async def save_user_preference(self, user_id: str, preference_key: str, preference_value: Any) -> bool:
+    """
+    Save a user preference related to candlestick pattern assessments.
+    
+    Args:
+        user_id: User identifier
+        preference_key: Preference key/name
+        preference_value: Preference value
+        
+    Returns:
+        Boolean indicating success
+    """
+    # ... Implementation with validation and persistence
+```
+
+#### Advanced Features:
+
+1. **Custom Caching System**
+
+The service implements a sophisticated caching system for expensive operations:
+
+```python
+# Simple in-memory cache for performance improvements
+_cache = {}
+
+def cached(ttl: int = 300, key_builder: Callable = None):
+    """
+    Simple decorator for caching expensive method results.
+    
+    Args:
+        ttl: Time-to-live in seconds for cached values
+        key_builder: Optional function to build cache key
+        
+    Returns:
+        Decorated function
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Build cache key
+            if key_builder:
+                cache_key = key_builder(*args, **kwargs)
+            else:
+                # Default key based on func name and args
+                cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+                
+            # Check cache
+            if cache_key in _cache:
+                entry = _cache[cache_key]
+                if entry['expires_at'] > datetime.datetime.now():
+                    logger.debug(f"Cache hit for {cache_key}")
+                    return entry['value']
+                    
+            # Execute function and cache result
+            logger.debug(f"Cache miss for {cache_key}")
+            result = await func(*args, **kwargs)
+            
+            _cache[cache_key] = {
+                'value': result,
+                'expires_at': datetime.datetime.now() + datetime.timedelta(seconds=ttl)
+            }
+            
+            # Schedule cache cleanup for this key
+            asyncio.create_task(_schedule_cache_cleanup(cache_key, ttl))
+            
+            return result
+        return wrapper
+    return decorator
+```
+
+2. **Safe Event Dispatching**
+
+A helper method for safely dispatching events without disrupting core functionality:
+
+```python
+def _safely_dispatch_event(self, event: Event) -> None:
+    """
+    Helper method to safely dispatch events with error handling.
+    
+    Args:
+        event: The event to dispatch
+    """
+    try:
+        self.event_dispatcher.dispatch(event)
+    except Exception as e:
+        logger.error(f"Error dispatching event {event.__class__.__name__}: {e}", exc_info=True)
+        # Continue execution - event dispatch failures shouldn't break core functionality
+```
+
+3. **Helper Methods**
+
+Various helper methods to improve code organization and reusability:
+
+```python
+def _extract_patterns_from_session(self, session: CandlestickSession) -> List[str]:
+    """
+    Helper method to extract unique pattern names from a session's questions.
+    
+    Args:
+        session: The session to extract patterns from
+        
+    Returns:
+        List of unique pattern names
+    """
+    patterns = set()
+    for q_id in session.questions:
+        # Try to get pattern from the question data if available in session metadata
+        if hasattr(session, 'question_metadata') and q_id in session.question_metadata:
+            metadata = session.question_metadata.get(q_id, {})
+            if 'pattern_name' in metadata:
+                patterns.add(metadata['pattern_name'])
+                
+    return list(patterns)
+```
+
+#### Factory Function:
+
+The service includes a comprehensive factory function for dependency injection:
+
+```python
+def create_candlestick_service(
+    question_repository=None,
+    session_repository=None,
+    assessment_repository=None,
+    question_generator=None,
+    answer_evaluator=None,
+    explanation_generator=None,
+    event_dispatcher=None,
+    preferences_repository=None,
+    user_metrics_service=None
+) -> CandlestickService:
+    """
+    Factory function to create a configured CandlestickService instance.
+    
+    This function allows dependency injection of all components, providing
+    flexibility for testing and customization.
+    
+    Args:
+        question_repository: Repository for questions
+        session_repository: Repository for sessions
+        assessment_repository: Repository for assessment aggregates
+        question_generator: Component to generate questions
+        answer_evaluator: Component to evaluate answers
+        explanation_generator: Component to generate explanations
+        event_dispatcher: Component to dispatch events
+        preferences_repository: Repository for user preferences
+        user_metrics_service: Service for user metrics
+        
+    Returns:
+        A fully configured CandlestickService instance
+    """
+    # ... Implementation with fallback instantiation of dependencies
+    
+    # Create and configure service instance
+    service = CandlestickService(
+        question_repository=question_repository,
+        session_repository=session_repository,
+        assessment_repository=assessment_repository,
+        question_generator=question_generator,
+        answer_evaluator=answer_evaluator,
+        explanation_generator=explanation_generator,
+        event_dispatcher=event_dispatcher
+    )
+    
+    # Set optional components
+    service.preferences_repository = preferences_repository
+    service.user_metrics_service = user_metrics_service
+    
+    return service
+```
+
+## Recently Improved Components
+
+### 1. Module Entry Point (`__init__.py`)
+
+The `__init__.py` file serves as the primary entry point for the candlestick patterns assessment module. Recent improvements have significantly enhanced its organization and maintainability:
+
+#### Key Enhancements:
+- **Improved Separation of Concerns**: Split the initialization process into distinct functions:
+  - `register_routes()`: Handles route registration
+  - `initialize_background_tasks()`: Sets up background tasks
+  - `initialize_module()`: Provides a unified initialization function
+- **Cleaner API**: Refactored for better readability and explicit function purposes
+- **Better Documentation**: Added comprehensive docstrings explaining function purposes
+- **Reduced Technical Debt**: Removed compatibility wrappers for sunset code
+
+#### Implementation Details:
+```python
+def register_routes(api_router: APIRouter) -> None:
+    """
+    Register routes for the candlestick patterns assessment module.
+    
+    Args:
+        api_router: The main API router to attach routes to
+    """
+    # Import controller here to avoid circular imports
+    from .candlestick_controller import router as candlestick_router
+    
+    # Register the module's router with the main API router
+    api_router.include_router(
+        candlestick_router,
+        prefix="/candlestick-patterns",
+        tags=["Candlestick Patterns Assessment"]
+    )
+    logger.info("Candlestick Patterns assessment routes registered")
+
+
+def initialize_background_tasks(app: FastAPI) -> None:
+    """
+    Initialize any background tasks needed by the candlestick patterns module.
+    
+    Args:
+        app: The FastAPI application instance
+    """
+    # Register any background tasks
+    from .tasks import cleanup_expired_sessions
+    
+    # Add background tasks to the app state
+    app.add_background_task(cleanup_expired_sessions)
+    logger.info("Candlestick Patterns background tasks initialized")
+
+
+def initialize_module(api_router: APIRouter, app: FastAPI) -> None:
+    """
+    Initialize the candlestick patterns module, including routes and background tasks.
+    
+    Args:
+        api_router: The main API router to attach routes to
+        app: The FastAPI application instance
+    """
+    register_routes(api_router)
+    initialize_background_tasks(app)
+    logger.info("Candlestick Patterns assessment module fully initialized")
+```
+
+### 2. Service Implementation (`candlestick_service.py`)
+
+The `candlestick_service.py` file has undergone significant enhancements to improve performance, maintainability, and type safety:
+
+#### Key Improvements:
+- **Added Generic Type Parameters**: Implemented type variables `Q` and `S` for better type safety
+- **Custom Caching System**: Created a TTL-based caching system for expensive operations
+- **Helper Methods**: Added utility methods for common tasks like safe event dispatching
+- **Comprehensive Error Handling**: Improved exception management throughout the service
+- **Standardized Return Types**: Ensured consistent return types for all methods
+- **Implemented Missing Methods**: Added complete implementations for previously unimplemented methods
+- **Enhanced Documentation**: Added detailed docstrings with parameter descriptions and return values
+
+#### Implementation Highlights:
+
+##### 1. Custom Caching Decorator
+```python
+def cached(ttl: int = 300, key_builder: Callable = None):
+    """
+    Simple decorator for caching expensive method results.
+    
+    Args:
+        ttl: Time-to-live in seconds for cached values
+        key_builder: Optional function to build cache key
+        
+    Returns:
+        Decorated function
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Build cache key
+            if key_builder:
+                cache_key = key_builder(*args, **kwargs)
+            else:
+                # Default key based on func name and args
+                cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+                
+            # Check cache
+            if cache_key in _cache:
+                entry = _cache[cache_key]
+                if entry['expires_at'] > datetime.datetime.now():
+                    logger.debug(f"Cache hit for {cache_key}")
+                    return entry['value']
+                    
+            # Execute function and cache result
+            logger.debug(f"Cache miss for {cache_key}")
+            result = await func(*args, **kwargs)
+            
+            _cache[cache_key] = {
+                'value': result,
+                'expires_at': datetime.datetime.now() + datetime.timedelta(seconds=ttl)
+            }
+            
+            # Schedule cache cleanup for this key
+            asyncio.create_task(_schedule_cache_cleanup(cache_key, ttl))
+            
+            return result
+        return wrapper
+    return decorator
+```
+
+##### 2. Safe Event Dispatching Helper
+```python
+def _safely_dispatch_event(self, event: Event) -> None:
+    """
+    Helper method to safely dispatch events with error handling.
+    
+    Args:
+        event: The event to dispatch
+    """
+    try:
+        self.event_dispatcher.dispatch(event)
+    except Exception as e:
+        logger.error(f"Error dispatching event {event.__class__.__name__}: {e}", exc_info=True)
+        # Continue execution - event dispatch failures shouldn't break core functionality
+```
+
+##### 3. Comprehensive Answer Submission
+```python
+async def submit_answer(
+    self,
+    session_id: str,
+    question_id: str,
+    answer: Any,
+    time_taken_ms: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Submit an answer for a question within a session.
+    
+    Args:
+        session_id: Session identifier
+        question_id: Question identifier
+        answer: User's answer
+        time_taken_ms: Optional time taken in milliseconds
+        
+    Returns:
+        Dictionary containing evaluation results and next question info
+        
+    Raises:
+        ValueError: If the session or question is not found or invalid
+        RuntimeError: If there's an error updating the session
+    """
+    # Retrieve session
+    session = await self.get_session(session_id)
+    if not session:
+        logger.error(f"submit_answer failed: Session {session_id} not found")
+        raise ValueError(f"Session {session_id} not found")
+    if session.status != SessionStatus.IN_PROGRESS:
+        logger.error(f"submit_answer failed: Session {session_id} is not in progress (status: {session.status.value})")
+        raise ValueError(f"Session {session_id} is not active.")
+
+    # Validate question ID belongs to session
+    if question_id not in session.questions:
+        logger.error(f"submit_answer failed: Question {question_id} not part of session {session_id}")
+        raise ValueError(f"Question {question_id} not found in session {session_id}")
+            
+    # ... additional implementation details ...
+    
+    # If session is now completed, perform completion tasks
+    if session.status == SessionStatus.COMPLETED:
+        # ... completion logic with safe event dispatching ...
+        
+        # Update user aggregate metrics with proper error handling
+        try:
+            logger.info(f"Attempting to update aggregate metrics for user {session.user_id}...")
+            metrics_updated = await self.user_metrics_service.update_metrics_from_session(session)
+            if metrics_updated:
+                logger.info(f"Aggregate metrics updated successfully for user {session.user_id}.")
+            else:
+                logger.warning(f"Aggregate metrics update returned False for user {session.user_id}.")
+        except Exception as metrics_err:
+            # Log error but don't fail the entire request because metrics failed
+            logger.error(f"Error updating user aggregate metrics for user {session.user_id} from session {session.id}: {metrics_err}", exc_info=True)
+            
+    # ... prepare and return response ...
+```
+
+##### 4. User Statistics with Caching
+```python
+@cached(ttl=300, key_builder=lambda self, user_id: f"user_stats:{user_id}")
+async def get_user_stats(self, user_id: str) -> Dict[str, Any]:
+    """
+    Get comprehensive statistics about a user's performance across candlestick patterns.
+    
+    Args:
+        user_id: User identifier
+        
+    Returns:
+        Dictionary with aggregated statistics
+        
+    Raises:
+        ValueError: If user_id is empty
+        RuntimeError: If there's an error retrieving or processing the data
+    """
+    # ... implementation with proper error handling and comprehensive statistics calculation ...
+```
+
+##### 5. Improved Factory Function
+```python
+def create_candlestick_service(
+    question_repository=None,
+    session_repository=None,
+    assessment_repository=None,
+    question_generator=None,
+    answer_evaluator=None,
+    explanation_generator=None,
+    event_dispatcher=None,
+    preferences_repository=None,
+    user_metrics_service=None
+) -> CandlestickService:
+    """
+    Factory function to create a configured CandlestickService instance.
+    
+    This function allows dependency injection of all components, providing
+    flexibility for testing and customization.
+    
+    Args:
+        question_repository: Repository for questions
+        session_repository: Repository for sessions
+        assessment_repository: Repository for assessment aggregates
+        question_generator: Component to generate questions
+        answer_evaluator: Component to evaluate answers
+        explanation_generator: Component to generate explanations
+        event_dispatcher: Component to dispatch events
+        preferences_repository: Repository for user preferences
+        user_metrics_service: Service for user metrics
+        
+    Returns:
+        A fully configured CandlestickService instance
+    """
+    # ... implementation with fallback instantiation of dependencies ...
+    
+    # Create and configure service instance
+    service = CandlestickService(
+        question_repository=question_repository,
+        session_repository=session_repository,
+        assessment_repository=assessment_repository,
+        question_generator=question_generator,
+        answer_evaluator=answer_evaluator,
+        explanation_generator=explanation_generator,
+        event_dispatcher=event_dispatcher
+    )
+    
+    # Set optional components
+    service.preferences_repository = preferences_repository
+    service.user_metrics_service = user_metrics_service
+    
+    return service
+```
+
+## Adaptive Difficulty System (`adaptive_difficulty.py`)
+
+The `adaptive_difficulty.py` file implements a sophisticated learning optimization engine that dynamically adjusts assessment difficulty based on user performance. This system ensures optimal learning outcomes by maintaining an appropriate challenge level for each user.
+
+### Core Architecture
+
+The adaptive difficulty system is built around five primary components working in concert:
+
+1. **UserPerformanceTracker**: Monitors and analyzes user performance on different patterns
+2. **ForgettingCurveManager**: Implements spaced repetition based on the Ebbinghaus forgetting curve
+3. **ReinforcementLearningDifficultyOptimizer**: Uses Q-learning to optimize difficulty selection
+4. **MultiBanditDifficultyOptimizer**: Uses Thompson sampling for exploration-exploitation balance
+5. **AdaptiveDifficultyEngine**: Integrates multiple optimization strategies into a unified decision framework
+
+### 1. UserPerformanceTracker
+
+This component tracks detailed metrics about user performance on individual candlestick patterns.
+
+#### Key Features:
+- Thread-safe operations with reentrant locking
+- Memory-efficient history tracking with automatic pruning
+- Pattern-specific performance metrics with automatic updates
+- Learning rate calculations based on performance trends
+- Forgetting curve implementation for memory retention modeling
+
+```python
+class UserPerformanceTracker:
+    """
+    Tracks user performance on different candlestick patterns over time.
+    
+    This class maintains:
+    1. Pattern-specific performance metrics
+    2. Learning rate for each pattern
+    3. Success rates under different time pressures
+    
+    Features:
+    - Memory-efficient history tracking with automatic pruning
+    - Thread-safe operations
+    - Optimized metric calculations with caching
+    """
+```
+
+Key methods include:
+- `record_attempt`: Records user attempts with metrics and automatic updates
+- `get_pattern_performance`: Returns a performance rating for specific patterns
+- `get_patterns_for_practice`: Intelligently selects patterns needing practice
+- `calculate_difficulty_adjustment`: Computes difficulty adjustment based on performance
+
+The tracker implements sophisticated metrics including:
+- **Mastery**: Long-term proficiency with a pattern (0.0-1.0)
+- **Confidence**: Short-term success rate with statistical confidence (0.0-1.0)
+- **Memory Strength**: Retention of pattern knowledge over time (0.0-1.0)
+- **Learning Rate**: How quickly the user gains proficiency (0.01-0.2)
+
+### 2. ForgettingCurveManager
+
+This component implements the Ebbinghaus forgetting curve model for optimal spaced repetition scheduling.
+
+#### Key Features:
+- Optimized retention calculations with caching
+- Smart scheduling of review intervals with exponential spacing
+- Dynamic adjustment based on recall quality
+- Thread-safe operations for concurrent access
+
+```python
+class ForgettingCurveManager:
+    """
+    Implements the forgetting curve algorithm for spaced repetition.
+    
+    This class determines:
+    1. When patterns should be reviewed
+    2. The optimal review intervals for each pattern
+    3. The difficulty adjustment for spaced repetition
+    
+    Features:
+    - Optimized retention calculations with caching
+    - Smart scheduling of review intervals
+    - Adapts to individual learning characteristics
+    """
+```
+
+Key methods include:
+- `calculate_next_review`: Computes when a pattern should next be reviewed
+- `update_due_factor`: Updates the spacing factor based on review results
+- `get_due_patterns`: Returns patterns due for review, sorted by priority
+- `get_optimal_batch`: Creates an optimal batch of patterns for review
+
+The system uses a sophisticated review schedule with increasing intervals:
+```python
+self.review_schedule = [
+    1,      # 1 hour
+    4,      # 4 hours
+    8,      # 8 hours
+    24,     # 1 day
+    72,     # 3 days
+    168,    # 1 week
+    336,    # 2 weeks
+    672,    # 4 weeks
+    1344,   # 8 weeks
+]
+```
+
+### 3. ReinforcementLearningDifficultyOptimizer
+
+This component uses Q-learning to optimize difficulty selection based on user performance and feedback.
+
+#### Key Features:
+- Memory-optimized sparse Q-table for state-action storage
+- Dynamic learning rate based on performance
+- Automatic Q-table cleanup for memory efficiency
+- Thread-safe with robust error handling
+
+```python
+class ReinforcementLearningDifficultyOptimizer:
+    """
+    Reinforcement Learning-based optimizer for difficulty levels.
+    
+    Uses a Q-learning approach to learn optimal difficulty adjustments
+    based on user performance.
+    
+    Features:
+    - Q-learning with adjustable exploration/exploitation
+    - Dynamic learning rate based on performance
+    - Memory-optimized state-action storage
+    """
+```
+
+Key methods include:
+- `update`: Updates Q-values based on action outcomes
+- `get_difficulty_adjustment`: Recommends difficulty adjustments based on Q-values
+- `serialize`/`deserialize`: Provides persistence capabilities
+
+The system uses a state representation that captures:
+- Mastery level (discretized into bins)
+- Confidence level (discretized into bins)
+- Streak information (consecutive correct/incorrect)
+
+And an action space covering difficulty adjustments from -2 to +2.
+
+### 4. MultiBanditDifficultyOptimizer
+
+This component uses a multi-armed bandit approach with Thompson sampling to balance exploration and exploitation in difficulty selection.
+
+#### Key Features:
+- Per-pattern bandit models for personalized difficulty
+- Bayesian updates with Thompson sampling
+- Memory-efficient model storage
+- Thread-safe operations
+
+```python
+class MultiBanditDifficultyOptimizer:
+    """
+    Multi-armed bandit approach to difficulty optimization.
+    
+    Uses a Thompson Sampling algorithm to model uncertainty and
+    balance exploration-exploitation tradeoff.
+    
+    Features:
+    - Per-pattern bandit models for personalized difficulty selection
+    - Bayesian updates with Thompson sampling
+    - Memory-efficient model storage
+    - Thread-safe operations
+    """
+```
+
+Key methods include:
+- `update`: Updates arm statistics based on outcomes
+- `get_difficulty_adjustment`: Selects actions using Thompson sampling
+- `_get_confidence_level`: Calculates confidence in selected adjustments
+
+The bandit model:
+- Represents each difficulty adjustment (-2 to +2) as an arm
+- Uses Beta distributions to model success probabilities
+- Samples from distributions to implement Thompson sampling
+- Adjusts arm values based on user mastery level
+
+### 5. AdaptiveDifficultyEngine
+
+This component integrates multiple optimization strategies into a unified decision-making framework.
+
+#### Key Features:
+- Thread-safe operations for concurrent access 
+- Multiple difficulty optimization strategies with weighted ensemble
+- Performance monitoring and analytics
+- Automated data persistence and recovery
+
+```python
+class AdaptiveDifficultyEngine:
+    """
+    Main engine for dynamic difficulty adjustment.
+    
+    Integrates multiple difficulty optimization strategies into a unified
+    decision-making framework.
+    
+    Features:
+    - Thread-safe operations for concurrent access
+    - Multiple difficulty optimization strategies with weighted ensemble
+    - Performance monitoring and analytics
+    - Automated data persistence and recovery
+    """
+```
+
+Key methods include:
+- `update_performance`: Updates all component models with new user performance
+- `get_recommended_difficulty`: Returns a combined difficulty recommendation
+- `get_optimal_pattern_batch`: Retrieves an optimal set of patterns for review
+- `get_performance_analytics`: Provides comprehensive performance analytics
+
+The decision-making process:
+1. Obtains recommendations from each optimizer
+2. Applies weighted ensemble averaging (with configurable weights)
+3. Converts the ensemble recommendation to a difficulty level
+4. Records decision analytics for transparency
+
+Default weights:
+```python
+self.decision_weights = {
+    "forgetting_curve": 0.35,
+    "rl": 0.30,
+    "bandit": 0.35
+}
+```
+
+### Utility Components
+
+#### ForgettingCurveModel
+
+A mathematical model implementing the Ebbinghaus forgetting curve formula:
+
+```python
+class ForgettingCurveModel:
+    """
+    Implements the underlying mathematical model for the forgetting curve.
+    
+    Provides utilities for calculating retention probabilities and 
+    determining optimal review intervals.
+    """
+```
+
+Key methods:
+- `calculate_retention`: Computes retention probability over time
+- `calculate_optimal_interval`: Determines the optimal review interval
+
+#### User Engine Management
+
+The system implements efficient user engine management:
+
+```python
+def get_engine_for_user(user_id: str) -> AdaptiveDifficultyEngine:
+    """
+    Get an adaptive difficulty engine instance for a user.
+    
+    This function caches engines to avoid recreating them unnecessarily.
+    """
+```
+
+Features:
+- Thread-safe engine caching
+- Automatic resource cleanup
+- Efficient memory management
+- Automatic state persistence
+
+### Technical Performance Features
+
+The adaptive difficulty system implements several advanced technical features:
+
+1. **Thread Safety**: All components use reentrant locks for thread-safe operations
+2. **Memory Optimization**:
+   - Sparse data structures for Q-tables and bandits
+   - Automatic cleanup of unused entries
+   - History pruning with distributed sample retention
+   - LRU caching for expensive calculations
+3. **Error Handling**:
+   - Comprehensive error catching and recovery
+   - Graceful degradation when components fail
+   - Detailed error logging for troubleshooting
+4. **Performance Tracking**:
+   - All methods are instrumented with execution time logging
+   - Comprehensive analytics generation
+   - Memory usage tracking
+5. **Persistence**:
+   - Full serialization/deserialization support
+   - Automatic periodic state saving
+   - Efficient state recovery
+
+### Integration Points
+
+The adaptive difficulty system integrates with:
+
+1. **Assessment Service**: Provides difficulty recommendations for new questions
+2. **Question Generator**: Receives difficulty parameters for question creation
+3. **Session Management**: Updates based on completed assessment sessions
+4. **User Performance Profile**: Contributes to the user's overall performance metrics
+5. **Learning Optimization**: Guides the user's learning journey
+
+### Example Usage Flow
+
+1. **Initial Difficulty Selection**:
+   ```python
+   # When creating a new assessment
+   engine = get_engine_for_user(user_id)
+   difficulty = engine.get_recommended_difficulty(pattern)
+   ```
+
+2. **After User Answers**:
+   ```python
+   # Update the system with the user's performance
+   engine.update_performance(
+       pattern=pattern,
+       difficulty=difficulty,
+       is_correct=is_correct,
+       response_time=response_time
+   )
+   ```
+
+3. **For Next Session Planning**:
+   ```python
+   # Get optimal patterns for next session
+   recommended_patterns = engine.get_optimal_pattern_batch(count=5)
+   ```
+
+4. **Getting Performance Analytics**:
+   ```python
+   # Retrieve detailed performance analytics
+   analytics = engine.get_performance_analytics()
+   ```
+
+### Future Extensions
+
+The system is designed for future enhancements including:
+
+1. **Neural Network Integration**: Replace Q-learning with deep reinforcement learning
+2. **Collaborative Filtering**: Use data from similar users to improve recommendations
+3. **Online Learning**: Continuous model updates in real-time
+4. **Explainable AI**: Provide reasoning for difficulty recommendations
+5. **Advanced Memory Models**: Implement more sophisticated memory retention models
+
+## Architecture
+
+The module is organized according to modern software design principles:
+
+1. **Domain Models** - Core business objects representing questions, sessions, and patterns
+2. **Repositories** - Data access layer for persistent storage
+3. **Services** - Business logic implementation
+4. **Utilities** - Helper functions and reusable components
+5. **Configuration** - Pattern definitions and difficulty settings
+6. **Event System** - Domain events for system communication
+
+### Key Components
+
+1. **Controller Layer**: Handles HTTP requests, validation, and response formatting
+2. **Service Layer**: Implements business logic, orchestrates workflows
+3. **Repository Layer**: Manages data access and persistence
+4. **Domain Models**: Represents core business entities and value objects
+5. **Utilities**: Provides supporting functionality (image generation, pattern detection)
+
+## File Structure
+
+```
+backend/assessments/candlestick_patterns/
+├── __init__.py                       # Module initialization and route registration
+├── candlestick_api.py                # Legacy API compatibility layer
+├── candlestick_controller.py         # Main API controller
+├── candlestick_service.py            # Business logic implementation
+├── candlestick_repository.py         # Data access implementation
+├── candlestick_models.py             # Domain models
+├── database_models.py                # ORM models for database
+├── router.py                         # FastAPI router configuration
+├── candlestick_explanation_generator.py  # Generates explanations for patterns
+├── candlestick_pattern_recognition.py    # Pattern recognition algorithms
+├── candlestick_pattern_identification.py # Pattern identification logic
+├── candlestick_utils.py              # Utility functions
+├── candlestick_questions.py          # Question generation logic
+├── candlestick_data_sync.py          # Data synchronization with external sources
+├── candlestick_db.py                 # Database operations
+├── candlestick_db_sync.py            # Background tasks for database maintenance
+├── candlestick_difficulty.py         # Difficulty calculation algorithms
+├── adaptive_difficulty.py            # Adaptive difficulty adjustment system
+├── answer_evaluation.py              # Answer evaluation logic
+├── question_generator.py             # Question generation system
+├── question_selection.py             # Question selection algorithms
+├── session_service.py                # Session management services
+├── tasks.py                          # Background tasks
+└── pattern_detection/                # Pattern detection algorithms
+    ├── __init__.py
+    ├── base_detector.py
+    ├── statistical_detector.py
+    ├── visual_detector.py
+    └── hybrid_detector.py
+```
+
+## Key Files and Their Purposes
+
+### Module Entry Points
+
+#### `__init__.py`
+
+This file serves as the main entry point for the module. It exports public components and provides initialization functions:
+
+```python
+def register_routes(app):
+    """
+    Register both main and legacy API routes with the FastAPI application.
+    """
+    # Register main API routes
+    app.include_router(
+        router, 
+        prefix="/api/assessments/candlestick",
+        tags=["candlestick-patterns"]
+    )
+    
+    # Register legacy API routes for backward compatibility
+    app.include_router(
+        legacy_router,
+        tags=["candlestick-patterns-legacy"]
+    )
+
+def initialize_background_tasks(app):
+    """Register background tasks like data synchronization."""
+    # ...
+
+def initialize_module(app):
+    """Main entry point for module initialization."""
+    register_routes(app)
+    initialize_background_tasks(app)
+```
+
+### API Layer
+
+#### `router.py`
+
+Defines the FastAPI router and registers the API endpoints:
+
+```python
+router = APIRouter(
+    tags=["candlestick-patterns"] 
+)
+
+# Register Assessment routes
+router.add_api_route(
+    "/start", 
+    CandlestickPatternController.start_assessment,
+    methods=["POST"]
+)
+# ...additional routes
+```
+
+#### `candlestick_controller.py`
+
+Implements the API controller that handles HTTP requests:
+
+```python
+class CandlestickPatternController(BaseAssessmentController[QuestionType, SessionType]):
+    """
+    Controller for candlestick pattern assessments.
+    """
+    
+    async def start_assessment(
+        self,
+        question_count: int = Query(10, gt=0, le=50),
+        difficulty: str = Query("medium"),
+        patterns: Optional[List[str]] = Query(None),
+        user_id: str = Depends(get_current_user_id),
+        service: CandlestickAssessmentService = Depends(create_candlestick_service)
+    ) -> Dict[str, Any]:
+        """Start a new candlestick pattern assessment session."""
+        # ...implementation
+```
+
+#### `candlestick_api.py`
+
+Provides backward compatibility for legacy API endpoints:
+
+```python
+@router.post("/v1/candlestick-patterns/start", tags=["candlestick-patterns-legacy"])
+async def start_assessment(
+    request: StartAssessmentRequest,
+    user_id: str = Depends(get_current_user_id),
+    req: Request = None
+) -> Dict[str, Any]:
+    """
+    Legacy endpoint to start a new assessment session.
+    Redirects to the new controller implementation.
+    """
+    # Convert request format
+    # Call new implementation
+    # Transform response to match legacy format
+```
+
+### Service Layer
+
+#### `candlestick_service.py`
+
+Implements business logic for the candlestick assessment:
+
+```python
+class CandlestickAssessmentService(AssessmentService[CandlestickQuestion, CandlestickSession]):
+    """
+    Service for managing candlestick pattern assessments.
+    """
+    
+    async def create_session(
+        self,
+        user_id: str,
+        question_count: int = 10,
+        topics: Optional[List[str]] = None,
+        difficulty: QuestionDifficulty = QuestionDifficulty.MEDIUM
+    ) -> CandlestickSession:
+        """Create a new assessment session."""
+        # ...implementation
+        
+    async def generate_question(
+        self,
+        session: CandlestickSession,
+        difficulty: QuestionDifficulty
+    ) -> CandlestickQuestion:
+        """Generate a question for the session."""
+        # ...implementation
+        
+    async def evaluate_answer(
+        self,
+        session_id: str,
+        question_id: str,
+        answer: str,
+        time_taken_ms: Optional[int] = None
+    ) -> AnswerEvaluation:
+        """Evaluate user's answer."""
+        # ...implementation
+```
+
+### Repository Layer
+
+#### `candlestick_repository.py`
+
+Implements data access for candlestick assessment entities:
+
+```python
+class CandlestickRepository(AssessmentRepository):
+    """Repository for candlestick pattern assessments."""
+    
+    @property
+    def question_repository(self) -> CandlestickQuestionRepository:
+        """Get the question repository."""
+        return self._question_repository
+    
+    @property
+    def session_repository(self) -> CandlestickSessionRepository:
+        """Get the session repository."""
+        return self._session_repository
+        
+    async def get_questions_for_session(
+        self,
+        difficulty: Optional[str] = None,
+        topics: Optional[List[str]] = None,
+        count: int = 10,
+        user_id: Optional[str] = None
+    ) -> List[CandlestickQuestion]:
+        """Get questions for a new session."""
+        # ...implementation
+```
+
+### Domain Models
+
+#### `candlestick_models.py`
+
+Defines the core domain entities:
+
+```python
+class CandlestickQuestion(BaseQuestion):
+    """Domain model for a candlestick pattern question."""
+    
+    pattern: str
+    chart_data: str  # Base64 encoded image
+    options: List[str]
+    explanation: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary representation."""
+        # ...implementation
+        
+class CandlestickSession(AssessmentSession):
+    """Domain model for a candlestick pattern assessment session."""
+    
+    previous_patterns: Set[str]
+    correct_patterns: Dict[str, int]
+    incorrect_patterns: Dict[str, int]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary representation."""
+        # ...implementation
+        
+class CandlestickAssessmentResponse(BaseModel):
+    """Response model for candlestick assessment API."""
+    
+    is_correct: bool
+    explanation: str
+    score: int
+    next_question: Optional[Dict[str, Any]] = None
+```
+
+#### `database_models.py`
+
+Defines ORM models for database persistence:
+
+```python
+class CandlestickQuestionDB(Base):
+    """Database model for candlestick questions."""
+    
+    __tablename__ = "candlestick_questions"
+    
+    id = Column(String, primary_key=True)
+    pattern = Column(String, nullable=False)
+    chart_data = Column(Text, nullable=False)
+    options = Column(JSON, nullable=False)
+    difficulty = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+class CandlestickSessionDB(Base):
+    """Database model for candlestick sessions."""
+    
+    __tablename__ = "candlestick_sessions"
+    
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String, default="active")
+    questions = Column(JSON, nullable=False)
+    current_question_index = Column(Integer, default=0)
+    correct_count = Column(Integer, default=0)
+    total_score = Column(Integer, default=0)
+```
+
+## Pattern Recognition System
+
+The pattern recognition system is a sophisticated component that identifies candlestick patterns in financial data using multiple approaches:
+
+### Hybrid Detection Architecture
+
+```
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│ Statistical      │    │ Computer Vision  │    │ AI/ML Model      │
+│ Pattern Analysis │    │ Image Processing │    │ Neural Network   │
+└────────┬─────────┘    └────────┬─────────┘    └────────┬─────────┘
+         │                       │                       │
+         └───────────────┬───────┴───────────────┬───────┘
+                         │                       │
+                  ┌──────┴───────┐       ┌──────┴───────┐
+                  │ Confidence   │       │ Pattern      │
+                  │ Scoring      │       │ Validation   │
+                  └──────┬───────┘       └──────┬───────┘
+                         │                      │
+                         └──────────┬───────────┘
+                                    │
+                           ┌────────┴────────┐
+                           │ Final Pattern   │
+                           │ Classification  │
+                           └─────────────────┘
+```
+
+#### Key Components
+
+1. **Statistical Analysis**: Uses price action and mathematical algorithms to identify patterns based on specific criteria
+2. **Visual Processing**: Analyzes the visual shape of candlestick formations
+3. **AI/ML Models**: Uses trained neural networks to recognize complex patterns
+4. **Hybrid Approach**: Combines results from all methods for highly accurate pattern identification
+
+### Adaptive Difficulty System
+
+The assessment features an adaptive difficulty system that adjusts question difficulty based on user performance:
+
+```
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│ User Performance │ ─> │ Difficulty       │ ─> │ Pattern          │
+│ History Analysis │    │ Calculation      │    │ Selection        │
+└──────────────────┘    └──────────────────┘    └──────────────────┘
+                                                          │
+┌──────────────────┐    ┌──────────────────┐             │
+│ Learning Rate    │ <─ │ Performance      │ <───────────┘
+│ Adjustment       │    │ Tracking         │
+└──────────────────┘    └──────────────────┘
+```
+
+This system ensures that:
+- New users start with appropriate difficulty
+- Advanced users receive challenging questions
+- Questions progressively adjust to the user's skill level
+- Learning is optimized through appropriate challenge levels
+
+## API Endpoints
+
+### Current API
+
+| Endpoint                                        | Method | Description                              |
+|-------------------------------------------------|--------|------------------------------------------|
+| `/api/assessments/candlestick/start`           | POST   | Start a new assessment session           |
+| `/api/assessments/candlestick/sessions/{id}`   | GET    | Get details for a specific session       |
+| `/api/assessments/candlestick/sessions/{id}/questions/{qid}` | GET | Get a specific question       |
+| `/api/assessments/candlestick/sessions/{id}/questions/{qid}/submit` | POST | Submit an answer      |
+| `/api/assessments/candlestick/sessions/{id}/complete` | POST | Complete a session                  |
+| `/api/assessments/candlestick/sessions/{id}/results` | GET | Get results for a completed session   |
+| `/api/assessments/candlestick/performance`     | GET    | Get user performance statistics          |
+| `/api/assessments/candlestick/patterns/{pattern}/explanation` | GET | Get explanation for a pattern |
+
+### Legacy API (Deprecated but Maintained)
+
+| Endpoint                                  | Method | Description                              |
+|-------------------------------------------|--------|------------------------------------------|
+| `/v1/candlestick-patterns/start`          | POST   | Start a new assessment session           |
+| `/v1/candlestick-patterns/submit_answer`  | POST   | Submit an answer                        |
+
+### Request/Response Examples
+
+#### Start Assessment (Current API)
+
+**Request:**
+```json
+POST /api/assessments/candlestick/start
+{
+  "question_count": 10,
+  "difficulty": "medium",
+  "patterns": ["Hammer", "Doji", "Engulfing"]
+}
+```
+
+**Response:**
+```json
+{
+  "session_id": "cs-12345abc",
+  "question_count": 10,
+  "difficulty": "MEDIUM",
+  "first_question": {
+    "id": "q-67890def",
+    "pattern": "Engulfing",
+    "chart_data": "base64_encoded_image_data",
+    "options": ["Hammer", "Doji", "Engulfing", "Morning Star"],
+    "time_limit_seconds": 25,
+    "question_number": 1
+  }
+}
+```
+
+#### Submit Answer (Current API)
+
+**Request:**
+```json
+POST /api/assessments/candlestick/sessions/cs-12345abc/questions/q-67890def/submit
+{
+  "answer": "Engulfing",
+  "time_taken_ms": 12500
+}
+```
+
+**Response:**
+```json
+{
+  "is_correct": true,
+  "explanation": "The Engulfing pattern is identified by...",
+  "score": 100,
+  "next_question": {
+    "id": "q-54321xyz",
+    "chart_data": "base64_encoded_image_data",
+    "options": ["Hammer", "Shooting Star", "Harami", "Evening Star"],
+    "time_limit_seconds": 25,
+    "question_number": 2
+  }
+}
+```
+
+## Integration Points
+
+### Base Assessment Framework Integration
+
+The candlestick module extends the base assessment framework by implementing:
+
+1. **Domain Models**: `CandlestickQuestion` and `CandlestickSession` inherit from base models
+2. **Repository Pattern**: `CandlestickRepository` implements the `AssessmentRepository` interface
+3. **Service Layer**: `CandlestickAssessmentService` extends the `AssessmentService` base class
+4. **Controller Layer**: `CandlestickPatternController` extends the `BaseAssessmentController` class
+
+### External System Integration
+
+The module integrates with:
+
+1. **Market Data Provider**: Fetches real financial data for generating authentic charts
+2. **Image Generation Service**: Creates candlestick chart visualizations
+3. **Metrics System**: Records user performance metrics
+4. **Gamification System**: Provides XP rewards and achievements
+5. **Redis Cache**: Caches patterns, statistics, and session data
+
+## Workflow Examples
+
+### Complete Assessment Flow
+
+1. **Start Assessment**:
+   - User requests a new assessment with parameters
+   - System creates a session with personalized difficulty
+   - First question is generated and returned
+
+2. **Question Generation**:
+   - System selects appropriate pattern based on difficulty and user history
+   - Chart is generated for the pattern
+   - Plausible distractors are selected as options
+
+3. **Answer Submission**:
+   - User submits their answer
+   - System evaluates correctness
+   - Explanation is generated based on user skill level
+   - Score is calculated based on correctness and time taken
+   - Next question is generated
+
+4. **Session Completion**:
+   - After last question or explicit completion
+   - Final results are calculated
+   - User performance metrics are updated
+   - Achievements and rewards are awarded
+   - Recommendations for improvement are generated
+
+### Adaptive Difficulty Example
+
+For a user who:
+1. Consistently performs well on "Hammer" and "Doji" patterns (90% correct)
+2. Struggles with "Evening Star" and "Three Black Crows" (30% correct)
+
+The system will:
+1. Increase difficulty for simple patterns (by using more ambiguous examples)
+2. Maintain moderate difficulty for complex patterns (clean examples)
+3. Present more practice opportunities for the challenging patterns
+4. Gradually increase frequency of complex patterns as performance improves
+
+## Testing
+
+The module includes several test suites:
+
+1. **Unit Tests**: Test individual components in isolation
+2. **Integration Tests**: Test interaction between components
+3. **API Tests**: Test API endpoints and responses
+4. **Performance Tests**: Test system under load
+5. **Pattern Recognition Tests**: Verify accuracy of pattern identification
+
+Key test files:
+- `test_candlestick_api.py`: Tests legacy API endpoints
+- `test_candlestick_controller.py`: Tests controller endpoints
+- `test_candlestick_service.py`: Tests service layer business logic
+- `test_candlestick_repository.py`: Tests repository layer data access
+- `test_pattern_recognition.py`: Tests pattern recognition algorithms
+
+## Legacy API Compatibility
+
+The module maintains backward compatibility through the `candlestick_api.py` file, which:
+
+1. Exposes legacy endpoints at the original URLs
+2. Translates legacy request formats to the new format
+3. Calls the new implementation
+4. Transforms responses back to the legacy format
+
+This allows older clients to continue functioning while new development occurs on the improved architecture.
+
+## Best Practices Implemented
+
+The module exemplifies several software engineering best practices:
+
+1. **Clean Architecture**: Clear separation of concerns with distinct layers
+2. **SOLID Principles**: 
+   - Single responsibility
+   - Open/closed design
+   - Liskov substitution
+   - Interface segregation
+   - Dependency inversion
+
+3. **Domain-Driven Design**: Models reflect business domain concepts
+4. **Repository Pattern**: Abstract data access behind interfaces
+5. **Dependency Injection**: Services and repositories injected into controllers
+6. **Error Handling**: Comprehensive error handling and reporting
+7. **Async/Await**: Non-blocking I/O for scalability
+8. **Type Annotations**: Comprehensive typing for code safety
+9. **Documentation**: Thorough docstrings and comments
+
+## Future Development
+
+The module is designed for extensibility in several areas:
+
+1. **Pattern Recognition**: New detection algorithms can be added through the pattern detection framework
+2. **Question Types**: Support for different question formats (multiple choice, free response, etc.)
+3. **Difficulty Algorithms**: Enhanced adaptive difficulty algorithms
+4. **Visualization**: Integration with advanced chart visualization libraries
+5. **AI-Powered Explanations**: More sophisticated explanation generation
+
+## Conclusion
+
+The Candlestick Pattern Assessment module provides a robust, extensible system for testing and improving users' ability to recognize candlestick patterns. Its clean architecture, comprehensive testing, and adherence to best practices make it maintainable and extensible for future development. The module balances technical complexity with user experience to deliver an effective learning tool for traders.
+
+## Question Selection System (`question_selection.py`)
+
+The `question_selection.py` file implements advanced probabilistic data structures and algorithms for intelligent question selection in the candlestick pattern assessment module.
+
+### Primary Components:
+
+1. **EnhancedBloomFilter**
+   - Implements a space-efficient probabilistic data structure for testing element membership
+   - Features multiple hash functions for better distribution
+   - Includes time-aware decay for question reuse after sufficient time
+   - Memory-optimized with timestamp storage limits and eviction strategies
+   - Supports user-specific filtering and customizable false positive rates
+
+2. **CountMinSketch**
+   - Implements a frequency estimation data structure for tracking question occurrence
+   - Provides efficient frequency estimation with controlled error
+   - Supports time decay to favor recent items
+   - Memory-efficient alternative to exact counters
+   - Includes error estimation and sketch merging capabilities
+
+3. **QuestionSelectionAlgorithm**
+   - Core algorithm for selecting appropriate questions for users
+   - Uses Bloom Filter for uniqueness checking
+   - Uses Count-Min Sketch for frequency tracking
+   - Supports question decaying to allow reuse after sufficient time
+   - Implements sophisticated candidate expansion strategies
+
+### Key Features:
+
+- **Uniqueness Guarantees**: Ensures users don't see the same questions repeatedly
+- **Intelligent Selection**: Selects questions based on difficulty, tags, and user history
+- **Memory Efficiency**: Optimized data structures with controlled memory usage
+- **Adaptive Time Decay**: Questions become eligible for reuse after configurable time periods
+- **Tag-Based Filtering**: Questions can be filtered by tags for topic-specific assessments
+- **Graceful Degradation**: Falls back to reasonable alternatives when constraints can't be met
+
+### Technical Highlights:
+
+```python
+def select_questions(
+    self,
+    user_id: UserId,
+    count: int,
+    difficulty_range: Tuple[Difficulty, Difficulty] = (0.0, 1.0),
+    required_tags: Optional[List[str]] = None,
+    excluded_question_ids: Optional[List[QuestionId]] = None
+) -> List[QuestionId]:
+    """
+    Select questions for a user based on various criteria.
+    
+    Args:
+        user_id: User identifier
+        count: Number of questions to select
+        difficulty_range: Range of acceptable difficulties (min, max)
+        required_tags: Optional tags that questions must have
+        excluded_question_ids: Optional question IDs to exclude
+        
+    Returns:
+        List of selected question IDs
+    """
+```
+
+This method implements a sophisticated multi-stage selection algorithm that:
+1. Filters the question pool based on tags
+2. Selects candidates matching difficulty criteria not seen by the user
+3. Expands candidates when insufficient questions are available
+4. Uses strategy patterns for different expansion methods
+5. Provides appropriate fallbacks for edge cases
+
+## Question Generator System (`question_generator.py`)
+
+The `question_generator.py` file provides a dynamic question generation framework that adapts to user performance and learning progress.
+
+### Primary Class: AdaptiveQuestionGenerator
+
+This class is responsible for generating questions that are appropriately challenging and educational for users based on their skill level and performance history.
+
+### Key Features:
+
+1. **Adaptive Difficulty**
+   - Questions adapt to user performance
+   - Supports skill level progression
+   - Provides appropriate challenge levels
+
+2. **Multi-Modal Question Types**
+   - Pattern recognition questions
+   - Prediction questions
+   - Characteristic questions
+   - Support for various formats (multiple choice, true/false, etc.)
+
+3. **Template-Based Generation**
+   - Uses template database for consistency
+   - Provides dynamic content variation
+   - Supports personalization based on user metrics
+
+4. **Intelligent Pattern Selection**
+   - Uses spaced repetition principles
+   - Tracks pattern mastery levels
+   - Ensures pattern diversity
+   - Focuses on areas needing improvement
+
+5. **Advanced Concurrency**
+   - Parallel question generation for performance
+   - Batch processing with error isolation
+   - Graceful degradation with fallbacks
+
+### Technical Highlights:
+
+```python
+async def generate_questions(
+    self,
+    count: int,
+    difficulty: Optional[QuestionDifficulty] = None,
+    topics: Optional[List[str]] = None,
+    exclude_ids: Optional[List[str]] = None
+) -> List[CandlestickQuestion]:
+    """
+    Generate multiple questions based on criteria.
+    
+    Args:
+        count: Number of questions to generate
+        difficulty: Optional difficulty level
+        topics: Optional list of topics to choose from
+        exclude_ids: Optional list of question IDs to exclude
+        
+    Returns:
+        List of generated questions
+    """
+```
+
+This method implements parallel question generation with:
+1. Batched processing for efficiency
+2. Concurrent execution using `asyncio.gather`
+3. Robust error handling and fallback mechanisms
+4. Pattern diversity enforcement
+5. Integration with selection algorithm
+
+### Memory Management:
+
+The generator includes sophisticated memory management:
+- Limited difficulty engine storage with LRU-like cache
+- Timestamp-based eviction strategies
+- Cached generation results with TTL
+- Resource cleanup for long-running services
+
+### Pattern Selection Strategy:
+
+The `_select_pattern` method uses a sophisticated strategy:
+- Categorizes patterns by mastery level (low, medium, high)
+- Weights selection to focus on low mastery (60%), medium (30%), and high (10%)
+- Filters recently used patterns to ensure diversity
+- Handles edge cases and provides fallbacks
+
+By combining probabilistic data structures, adaptive algorithms, and concurrent processing, these two systems form the foundation of the TradeIQ platform's ability to deliver personalized, effective learning experiences for candlestick pattern recognition.
+
+## Data Models Implementation (`candlestick_models.py`)
+
+The `candlestick_models.py` file implements the core data models used throughout the candlestick pattern assessment system. These models represent the fundamental entities and relationships in the domain, providing strongly-typed, validated data structures with built-in serialization capabilities.
+
+### File Overview
+
+- **Purpose**: Defines the data model classes for candlestick pattern assessments
+- **Design Pattern**: Uses the dataclass pattern with validation and serialization
+- **Dependencies**: Extends base assessment models with pattern-specific functionality
+- **Key Classes**: `CandlestickQuestion`, `CandlestickSession`, `CandlestickAssessmentResponse`
+
+### Optimizations and Best Practices
+
+The implementation follows several best practices and optimization techniques:
+
+1. **Memory Optimization**
+   - Uses `__slots__` to reduce memory footprint of instances
+   - Implements class-level constants to avoid duplication
+   - Employs LRU caching for frequently accessed pattern descriptions
+   - Limits collection sizes to prevent unbounded memory growth
+
+2. **Error Handling**
+   - Implements comprehensive validation in `__post_init__` methods
+   - Uses try-except blocks with specific error types
+   - Provides fallback values for error conditions
+   - Includes detailed logging for debugging
+
+3. **Type Safety**
+   - Provides explicit type annotations for all attributes and methods
+   - Validates input types at runtime
+   - Ensures consistent return types
+   - Uses ClassVar for class-level attributes
+
+4. **Performance Enhancements**
+   - Caches expensive operations with `lru_cache`
+   - Implements efficient dictionary lookups
+   - Uses string formatting efficiently
+   - Limits collection sizes for response time calculations
+
+### Class Descriptions
+
+#### `CandlestickQuestion`
+
+This class represents a question in a candlestick pattern assessment, extending the base `BaseQuestion` class with pattern-specific fields.
+
+```python
+@dataclass
+class CandlestickQuestion(BaseQuestion):
+    pattern: str
+    pattern_strength: PatternStrength
+    chart_data: Dict[str, Any]
+    chart_image: str
+    timeframe: str
+    symbol: str
+    options: List[str]
+```
+
+**Key Features**:
+
+1. **Pattern Validation**
+   - Validates that pattern names are valid enum values
+   - Uses fuzzy matching to suggest corrections for invalid patterns
+   - Ensures required fields are present and properly typed
+
+2. **Answer Evaluation**
+   - Normalizes answers for case-insensitive comparison
+   - Generates appropriate feedback based on correctness
+   - Creates detailed explanations based on pattern characteristics
+
+3. **Pattern Description Generation**
+   - Provides caching for pattern descriptions to improve performance
+   - Adjusts description detail based on user knowledge level
+   - Supports different explanation styles for various pattern types
+
+4. **Serialization**
+   - Implements comprehensive to_dict() and from_dict() methods
+   - Includes error handling for serialization failures
+   - Provides minimal valid representations in error cases
+
+**Method Highlights**:
+
+- `_find_closest_match`: Uses difflib to find similar patterns when an invalid pattern is specified
+- `evaluate_answer`: Provides a complete evaluation framework with scores, feedback, and explanations
+- `get_pattern_description`: Static method with LRU caching to efficiently retrieve pattern descriptions
+
+#### `CandlestickSession`
+
+Represents a user's session within a candlestick pattern assessment, tracking progress, performance, and statistics.
+
+```python
+@dataclass
+class CandlestickSession(AssessmentSession):
+    patterns_identified: List[str] = field(default_factory=list)
+    average_response_time_ms: float = 0.0
+    streak: int = 0
+    max_streak: int = 0
+    performance_by_pattern: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+```
+
+**Key Features**:
+
+1. **Performance Tracking**
+   - Tracks identified patterns throughout the session
+   - Maintains streak and max streak for gamification
+   - Records and analyzes performance metrics per pattern
+   - Calculates average response times with proper statistical methods
+
+2. **Answer Recording**
+   - Updates session metrics when answers are recorded
+   - Handles streak tracking and pattern identification
+   - Updates pattern-specific performance metrics
+
+3. **Validation and Safety**
+   - Validates all fields during initialization
+   - Ensures proper types for all attributes
+   - Prevents negative streaks or invalid collections
+
+4. **Metrics Generation**
+   - Provides detailed performance metrics
+   - Groups patterns by difficulty based on user performance
+   - Normalizes difficulty levels for frontend consumption
+
+**Method Highlights**:
+
+- `record_answer`: Comprehensive method for recording answers and updating metrics
+- `_update_pattern_performance`: Tracks pattern-specific metrics with memory management
+- `get_performance`: Generates comprehensive assessment metrics for the session
+- `_get_patterns_by_difficulty`: Groups patterns into difficulty buckets based on user performance
+
+#### `CandlestickAssessmentResponse`
+
+Encapsulates the response sent to clients after answer submission, including correctness, feedback, explanations, and next steps.
+
+```python
+@dataclass
+class CandlestickAssessmentResponse(SerializableMixin):
+    is_correct: bool = False
+    score: int = 0
+    feedback: str = ""
+    explanation: str = ""
+    pattern: Optional[str] = None
+    pattern_description: Optional[str] = None
+    assessment_complete: bool = False
+    next_question: Optional[Dict[str, Any]] = None
+    performance: Optional[Dict[str, Any]] = None
+```
+
+**Key Features**:
+
+1. **Response Validation**
+   - Ensures score is non-negative
+   - Validates string fields
+   - Verifies dictionary fields are properly typed
+
+2. **Memory Management**
+   - Truncates long explanations to conserve memory
+   - Cleans response objects to remove unnecessary data
+   - Optimizes data structures for frontend consumption
+
+3. **Error Handling**
+   - Provides robust error handling during creation
+   - Returns minimal valid responses in error cases
+   - Logs detailed error information for debugging
+
+4. **Factory Methods**
+   - Implements `from_evaluation` to create responses from evaluations
+   - Provides `from_dict` for deserialization
+   - Handles missing or invalid data gracefully
+
+**Method Highlights**:
+
+- `from_evaluation`: Factory method that creates responses from answer evaluations
+- `to_dict`: Creates dictionary representations with field validation
+- `from_dict`: Creates instances from dictionary data with validation
+
+### Pattern Types and Descriptions
+
+The module includes comprehensive support for various candlestick patterns:
+
+1. **Single Candle Patterns**
+   - Doji: Represents market indecision with equal open and close prices
+   - Hammer: Shows potential bullish reversal with long lower shadow
+   - Shooting Star: Indicates potential bearish reversal with long upper shadow
+
+2. **Two Candle Patterns**
+   - Bullish Engulfing: Second candle completely engulfs the first, indicating bullish reversal
+   - Bearish Engulfing: Second candle completely engulfs the first, indicating bearish reversal
+   - Harami: Second candle is contained within the first, showing potential trend reversal
+
+3. **Three Candle Patterns**
+   - Morning Star: Three-candle bullish reversal pattern at bottom of downtrend
+   - Evening Star: Three-candle bearish reversal pattern at top of uptrend
+   - Three White Soldiers: Three consecutive bullish candles indicating strong upward trend
+   - Three Black Crows: Three consecutive bearish candles indicating strong downward trend
+
+### Integration with Other Components
+
+The data models integrate with other system components through:
+
+1. **Assessment Framework**
+   - Extends base classes from the assessment framework
+   - Implements required interfaces for service integration
+   - Supports serialization for database storage
+
+2. **Pattern Recognition**
+   - Provides data structures for pattern identification
+   - Supports pattern strength classifications
+   - Includes metadata for pattern characteristics
+
+3. **User Interface**
+   - Generates client-friendly response objects
+   - Provides cleaned data structures for frontend consumption
+   - Supports progressive question delivery
+
+4. **Analytics System**
+   - Tracks detailed performance metrics
+   - Supports pattern difficulty classification
+   - Provides data for user progress tracking
+
+### Example Usage
+
+```python
+# Creating a question
+question = CandlestickQuestion(
+    id=str(uuid.uuid4()),
+    question_type="candlestick_pattern",
+    question_text="Identify the candlestick pattern:",
+    difficulty=QuestionDifficulty.MEDIUM,
+    topics=["reversal_patterns"],
+    pattern="BULLISH_ENGULFING",
+    pattern_strength=PatternStrength.STRONG,
+    chart_data={"ohlc": [...]},
+    chart_image="base64_encoded_image",
+    timeframe="1H",
+    symbol="BTC/USD",
+    options=["BULLISH_ENGULFING", "HAMMER", "MORNING_STAR", "DOJI"]
+)
+
+# Evaluating an answer
+evaluation = question.evaluate_answer("BULLISH_ENGULFING")
+print(f"Correct: {evaluation.is_correct}, Score: {evaluation.score}")
+
+# Creating a session
+session = CandlestickSession(
+    id=str(uuid.uuid4()),
+    user_id="user123",
+    assessment_type=AssessmentType.CANDLESTICK
+)
+
+# Recording an answer
+session.record_answer(
+    question_id=question.id,
+    answer_value="BULLISH_ENGULFING",
+    time_taken_ms=15000,
+    evaluation=evaluation
+)
+
+# Getting performance metrics
+metrics = session.get_performance()
+print(f"Total score: {metrics.total_score}, Streak: {session.streak}")
+
+# Creating a response
+response = CandlestickAssessmentResponse.from_evaluation(
+    evaluation=evaluation,
+    pattern="BULLISH_ENGULFING",
+    assessment_complete=False,
+    user_level="intermediate"
+)
+
+# Serializing to JSON
+response_json = json.dumps(response.to_dict())
+```
+
+### Future Development Areas
+
+The data models are designed for future expansion in several areas:
+
+1. **Multi-pattern Questions**
+   - Support for questions requiring identification of multiple patterns
+   - Combined pattern detection scenarios
+   - Pattern sequence identification
+
+2. **Enhanced Performance Tracking**
+   - More detailed pattern difficulty calculations
+   - Time-decay for performance metrics
+   - Weighted scoring based on pattern difficulty
+
+3. **Personalization Features**
+   - User preference integration
+   - Learning style adaptation
+   - Difficulty preferences
+
+4. **Additional Pattern Types**
+   - Support for harmonic patterns
+   - Integration with Elliott Wave patterns
+   - Custom pattern definitions
+
+### Technical Implementation Details
+
+The module uses several advanced Python features and techniques:
+
+1. **Dataclasses**
+   - Uses the `dataclass` decorator for concise class definitions
+   - Implements `__post_init__` for validation
+   - Leverages field factories for collection initialization
+
+2. **Type Annotations**
+   - Comprehensive typing throughout the codebase
+   - Support for Union, Optional, and collection types
+   - ClassVar for class-level attributes
+
+3. **Error Handling**
+   - Comprehensive try-except blocks
+   - Specific error types
+   - Fallback mechanisms
+   - Detailed logging
+
+4. **Caching Mechanisms**
+   - LRU cache for pattern descriptions
+   - Class-level caching for reused data
+   - Memory-conscious caching with size limits
+
+5. **Serialization Patterns**
+   - Consistent to_dict/from_dict methods
+   - Error handling during serialization
+   - Minimal valid representations for error cases
+
+Overall, the `candlestick_models.py` file represents a robust, well-designed implementation of the domain models for candlestick pattern assessment, providing a solid foundation for the rest of the system while ensuring maintainability, performance, and extensibility.
+
+
+
+## Pattern Recognition AI System (`candlestick_ai.py`)
+
+The `candlestick_ai.py` file implements the AI-powered pattern recognition system used throughout the candlestick pattern assessment module. This system provides accurate, efficient candlestick pattern detection using a variety of models and approaches.
+
+### File Overview
+
+- **Purpose**: Provides AI-powered candlestick pattern detection capabilities
+- **Design Pattern**: Uses factory and service patterns for flexible implementation
+- **Dependencies**: Integrates with various model types (rule-based and neural network)
+- **Key Classes**: `ModelFactory`, `PatternService`, `RuleBasedModel`, `CNNModel`
+
+### Optimizations and Best Practices
+
+The implementation incorporates several advanced techniques and best practices:
+
+1. **Memory Optimization**
+   - Uses `weakref.WeakValueDictionary` for model caching to prevent memory leaks
+   - Implements TTL (time-to-live) mechanisms for model instances
+   - Employs lazy initialization to defer resource-intensive operations
+   - Includes automatic cleanup of expired model resources
+
+2. **Thread Safety**
+   - Implements thread-safe singleton pattern for service instances
+   - Uses thread locks for critical sections to prevent race conditions
+   - Ensures thread-safe model initialization and resource management
+   - Employs atomic operations for cache updates and cleanups
+
+3. **Performance Enhancements**
+   - Efficiently caches model instances to avoid repeated initialization
+   - Implements model preloading for frequently used patterns
+   - Uses batch processing for multiple pattern detection requests
+   - Optimizes image preprocessing for neural network models
+
+4. **Error Handling**
+   - Provides graceful degradation between model types when errors occur
+   - Implements comprehensive exception catching and handling
+   - Includes fallback mechanisms for detection failures
+   - Features detailed error logging with context information
+
+### Class Descriptions
+
+#### `ModelFactory`
+
+This class implements the factory pattern for creating and managing different types of pattern detection models.
+
+```python
+class ModelFactory:
+    """
+    Factory for creating and managing candlestick pattern detection models.
+    
+    This class handles model instantiation, caching, and configuration,
+    supporting different model types and parameters.
+    """
+    # Cache of model instances using weak references
+    _model_cache = weakref.WeakValueDictionary()
+    _cache_lock = threading.RLock()
+```
+
+**Key Features**:
+
+1. **Efficient Model Caching**
+   - Uses weak references to prevent memory leaks
+   - Maintains a thread-safe cache of model instances
+   - Provides automatic cleanup of unused models
+
+2. **Flexible Model Creation**
+   - Supports multiple model types (rule-based, CNN)
+   - Handles model-specific initialization parameters
+   - Provides fallback mechanisms for model creation failures
+
+3. **Resource Management**
+   - Implements proper cleanup methods for model resources
+   - Ensures GPU memory is released when models are no longer needed
+   - Tracks and limits total number of active models
+
+**Method Highlights**:
+
+- `create_model`: Creates a new model instance or retrieves from cache
+- `clear_cache`: Explicitly clears the model instance cache
+- `get_model_stats`: Provides statistics about model usage and performance
+
+#### `PatternService`
+
+This class provides a high-level service interface for pattern detection operations, abstracting the complexities of model management.
+
+```python
+class PatternService:
+    """
+    Service class for candlestick pattern detection.
+    
+    This class provides a simplified interface for detecting patterns,
+    managing models, and tracking performance metrics.
+    """
+    def __init__(
+        self,
+        model_type: str = "rule_based",
+        confidence_threshold: float = 0.7,
+        preferred_model: Optional[str] = None,
+        model_ttl: int = 3600
+    ):
+        """Initialize the pattern service with configuration."""
+```
+
+**Key Features**:
+
+1. **Model Lifecycle Management**
+   - Implements TTL-based model expiration
+   - Handles model initialization and swapping
+   - Provides automatic model refresh for outdated models
+
+2. **Detection Capabilities**
+   - Offers both synchronous and asynchronous detection methods
+   - Supports batch detection for multiple patterns
+   - Includes confidence thresholds for reliable detection
+
+3. **Performance Monitoring**
+   - Tracks detection times and success rates
+   - Implements adaptive confidence thresholds
+   - Records pattern-specific performance metrics
+
+4. **Resource Optimization**
+   - Efficiently manages model resources
+   - Implements cache control for detection results
+   - Provides cleanup methods for explicit resource management
+
+**Method Highlights**:
+
+- `detect_patterns`: Detects patterns in the provided chart data
+- `async_detect_patterns`: Asynchronously detects patterns
+- `swap_model`: Changes the underlying model type or configuration
+- `clear_caches`: Clears both model and detection result caches
+
+#### `RuleBasedModel`
+
+This class implements traditional algorithm-based pattern detection using established technical analysis rules.
+
+```python
+class RuleBasedModel:
+    """
+    Rule-based candlestick pattern detection model.
+    
+    This model uses traditional technical analysis rules and algorithms
+    to identify candlestick patterns in price data.
+    """
+```
+
+**Key Features**:
+
+1. **Pattern Detection Logic**
+   - Implements precise mathematical definitions for each pattern
+   - Uses configurable thresholds for pattern identification
+   - Supports variable sensitivity levels for detection
+
+2. **Performance Optimization**
+   - Employs efficient algorithms for pattern detection
+   - Implements early rejection for obviously non-matching patterns
+   - Uses vectorized operations for performance
+
+3. **Accuracy Enhancements**
+   - Includes confirmation checks for detected patterns
+   - Calculates confidence scores for each detection
+   - Supports multiple detection passes with different parameters
+
+**Method Highlights**:
+
+- `detect`: Detects patterns in OHLC price data
+- `calculate_confidence`: Calculates a confidence score for a detected pattern
+- `get_pattern_characteristics`: Retrieves characteristics of a specific pattern
+
+#### `CNNModel`
+
+This class implements neural network-based pattern detection using convolutional neural networks.
+
+```python
+class CNNModel:
+    """
+    Convolutional Neural Network model for candlestick pattern detection.
+    
+    This model uses deep learning techniques to identify patterns in
+    candlestick chart images with high accuracy.
+    """
+```
+
+**Key Features**:
+
+1. **Neural Network Architecture**
+   - Uses a specialized CNN architecture for image pattern recognition
+   - Implements transfer learning with pre-trained weights
+   - Supports fine-tuning for specific pattern types
+
+2. **GPU Acceleration**
+   - Efficiently uses GPU resources when available
+   - Implements CPU fallback for deployment flexibility
+   - Optimizes tensor operations for performance
+
+3. **Image Processing**
+   - Includes specialized preprocessing for candlestick charts
+   - Normalizes inputs for consistent model performance
+   - Implements data augmentation for improved accuracy
+
+4. **Batched Operations**
+   - Supports efficient batch processing of multiple images
+   - Optimizes memory usage during inference
+   - Parallelizes preprocessing when possible
+
+**Method Highlights**:
+
+- `preprocess_image`: Prepares an image for neural network input
+- `detect`: Performs pattern detection on chart images
+- `get_model_confidence`: Retrieves prediction confidence scores
+
+### Integration With Other Components
+
+The AI pattern recognition system integrates with:
+
+1. **Chart Generation System**
+   - Receives chart data for pattern detection
+   - Provides feedback for chart quality and clarity
+   - Optimizes chart representation for detection accuracy
+
+2. **Question Generation**
+   - Validates patterns in generated questions
+   - Ensures correct pattern labeling
+   - Provides pattern difficulty ratings
+
+3. **Performance Analytics**
+   - Contributes detection confidence metrics
+   - Provides pattern similarity information
+   - Supports pattern confusion analysis
+
+4. **Answer Evaluation**
+   - Assists in evaluating ambiguous user answers
+   - Provides pattern confidence scores for partial credit
+   - Helps generate detailed explanations based on visual features
+
+### Technical Implementation Details
+
+The module uses several advanced techniques for optimal performance:
+
+1. **Model Versioning**
+   - Implements versioning for both model types and weights
+   - Provides backward compatibility for older model versions
+   - Supports seamless model updates
+
+2. **Hybrid Detection**
+   - Combines multiple model outputs for improved accuracy
+   - Implements ensemble approaches for difficult patterns
+   - Weighs model outputs based on historical performance
+
+3. **Adaptive Resources**
+   - Scales resource usage based on detection requirements
+   - Implements progressive model loading (simple to complex)
+   - Adjusts precision based on available computing resources
+
+4. **Serialization**
+   - Efficiently serializes detection results for storage
+   - Implements compressed model serialization for transfer
+   - Provides standardized formats for cross-system compatibility
+
+### Example Usage
+
+```python
+# Creating a pattern service
+service = PatternService(
+    model_type="cnn",
+    confidence_threshold=0.75,
+    model_ttl=7200  # 2 hours
+)
+
+# Detecting patterns in chart data
+chart_data = {
+    "open": [100.0, 101.5, 103.2, 102.8, 104.1],
+    "high": [103.0, 102.8, 104.7, 103.5, 105.3],
+    "low": [99.2, 100.1, 102.3, 101.9, 103.2],
+    "close": [101.5, 103.2, 102.8, 104.1, 105.0],
+    "volume": [1500, 1350, 1420, 1650, 1800]
+}
+
+# Synchronous detection
+patterns = service.detect_patterns(chart_data)
+print(f"Detected patterns: {patterns}")
+
+# Async detection
+async def detect_async():
+    patterns = await service.async_detect_patterns(chart_data)
+    print(f"Asynchronously detected patterns: {patterns}")
+
+# Switching models
+service.swap_model("rule_based")
+
+# Clearing caches
+service.clear_caches()
+```
+
+### Future Development Areas
+
+The AI pattern recognition system is designed for ongoing development in several key areas:
+
+1. **Advanced Model Types**
+   - Transformer-based models for sequence pattern detection
+   - Hybrid CNN-LSTM models for temporal pattern recognition
+   - Attention mechanisms for focusing on relevant price action
+
+2. **Performance Improvements**
+   - Quantized models for faster inference
+   - Pruned neural networks for efficiency
+   - Specialized models for different pattern families
+
+3. **Extended Pattern Support**
+   - Expansion to harmonic patterns
+   - Support for multiple timeframe confirmations
+   - Detection of pattern combinations and sequences
+
+4. **Explainability Features**
+   - Visual heatmaps showing detection focus areas
+   - Confidence breakdown for pattern components
+   - Comparative visualization of similar patterns
+
+### Technical Specifications
+
+The module implements several technical innovations:
+
+1. **Model Architecture**
+   - CNN backbone with residual connections
+   - Multiple detection heads for different pattern families
+   - Feature pyramid network for multi-scale detection
+
+2. **Optimization Techniques**
+   - Model pruning for inference efficiency
+   - Mixed precision operations where supported
+   - Operation fusion for performance
+
+3. **Memory Management**
+   - Progressive loading of model components
+   - Intelligent cache invalidation strategies
+   - Resource-aware operation batching
+
+4. **Threading Model**
+   - Thread pool for parallel detection tasks
+   - Worker management to prevent thread explosion
+   - Priority scheduling for interactive requests
+
+The `candlestick_ai.py` file represents a sophisticated AI-powered pattern recognition system that balances accuracy, performance, and resource efficiency. Its modular design allows for ongoing development and improvement while maintaining backward compatibility and reliable operation.
+
+### 4. Configuration System (`candlestick_config.py`)
+
+The `candlestick_config.py` file serves as the backbone of the entire candlestick pattern assessment system, providing a centralized configuration repository that ensures consistency, flexibility, and robust operation across the application.
+
+#### Module Overview
+
+The configuration module (version 1.1.0) provides:
+
+1. **Pattern Definitions**: Comprehensive catalog of candlestick patterns with descriptions and categorizations
+2. **Difficulty Classifications**: Mapping patterns to appropriate difficulty levels
+3. **Assessment Parameters**: Scoring algorithms, time limits, and adaptive difficulty settings
+4. **Data Source Management**: Configuration for market data providers and fallback mechanisms
+5. **Cache Settings**: Performance optimization through strategic caching
+6. **Environment Integration**: Dynamic configuration through environment variables
+7. **Validation Tools**: Ensuring configuration consistency and correctness
+
+#### Key Architectural Components
+
+##### Enum & Type Definitions
+
+The module establishes core enumerations that define the system's vocabulary:
+
+```python
+class PatternCategory(str, Enum):
+    """Enum defining candlestick pattern categories."""
+    SINGLE = "single"    # Patterns with a single candle
+    DOUBLE = "double"    # Patterns with two candles
+    TRIPLE = "triple"    # Patterns with three candles
+    COMPLEX = "complex"  # Patterns with multiple candles in specific arrangements
+```
+
+```python
+class DifficultyLevel(str, Enum):
+    """Enum defining difficulty levels for assessment questions."""
+    BEGINNER = "beginner"
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
+    EXPERT = "expert"
+    
+    def to_numeric(self) -> float:
+        """Convert difficulty level to numeric value between 0 and 1."""
+        mapping = {
+            self.BEGINNER: 0.0,
+            self.EASY: 0.25,
+            self.MEDIUM: 0.5,
+            self.HARD: 0.75,
+            self.EXPERT: 1.0
+        }
+        return mapping[self]
+```
+
+This robust enum implementation provides string-based values for easy serialization and includes convenience methods for conversion between string and numeric representations.
+
+##### API Provider Configurations
+
+The module defines structured types for external data providers:
+
+```python
+class RateLimitSettings(TypedDict):
+    """Rate limit settings for API providers."""
+    requests_per_minute: int
+    max_daily_requests: int
+
+
+class DataProviderConfig(TypedDict):
+    """Configuration for market data providers."""
+    provider: str
+    api_key: str
+    base_url: str
+    timeout: int
+    rate_limit: RateLimitSettings
+```
+
+The market data configuration supports primary and fallback providers with rate limiting:
+
+```python
+MARKET_DATA: Final[Dict[str, Union[DataProviderConfig, MarketDataCommonConfig]]] = {
+    # Primary data source
+    "primary": {
+        "provider": "alphavantage",
+        "api_key": os.environ.get("ALPHAVANTAGE_API_KEY", "demo"),
+        "base_url": "https://www.alphavantage.co/query",
+        "timeout": 10,  # seconds
+        "rate_limit": {
+            "requests_per_minute": 5,
+            "max_daily_requests": 500
+        }
+    },
+    # Fallback data source
+    "fallback": {
+        "provider": "finnhub",
+        "api_key": os.environ.get("FINNHUB_API_KEY", "demo"),
+        "base_url": "https://finnhub.io/api/v1",
+        "timeout": 8,  # seconds
+        "rate_limit": {
+            "requests_per_minute": 10,
+            "max_daily_requests": 60
+        }
+    },
+    # Common settings
+    "common": {
+        "default_symbols": ["AAPL", "MSFT", "AMZN", "GOOG", "META", "TSLA", "NVDA", "JPM", "BAC", "WMT"],
+        "default_timeframes": ["1d", "4h", "1h", "30min"],
+        "data_ttl": 3600,  # Cache TTL in seconds (1 hour)
+        "max_candles_per_request": 100
+    }
+}
+```
+
+##### Cache Configuration
+
+The module implements a comprehensive caching system:
+
+```python
+@dataclass(frozen=True)
+class CacheConfig:
+    """Configuration for Redis cache settings."""
+    # Cache key prefixes
+    market_data_prefix: str = "candlestick:market_data:"
+    session_prefix: str = "candlestick:session:"
+    question_prefix: str = "candlestick:question:"
+    user_stats_prefix: str = "candlestick:user:stats:"
+    pattern_stats_prefix: str = "candlestick:pattern:stats:"
+    rate_limit_prefix: str = "candlestick:rate_limit:"
+    
+    # Time-to-live settings (in seconds)
+    default_ttl: int = 3600  # 1 hour
+    session_ttl: int = 3600  # 1 hour
+    backup_ttl: int = 86400  # 24 hours
+    question_ttl: int = 86400  # 24 hours
+    market_data_ttl: int = 21600  # 6 hours
+    
+    # Recovery settings
+    max_recovery_attempts: int = 3
+    recovery_retry_delay: int = 5  # seconds
+    
+    # Stream settings
+    stream_max_length: int = 10000  # Maximum number of entries per stream
+    stream_group_prefix: str = "candlestick:group:"
+    
+    # Rate limiting
+    rate_limit_window: int = 60  # 1 minute window for rate limits
+    
+    # Event processing
+    event_consumer_group: str = "candlestick_processors"
+    event_batch_size: int = 10
+    event_poll_interval: int = 1000  # ms
+    
+    def get_full_key(self, prefix: str, key: str) -> str:
+        """
+        Create a full Redis key with the appropriate prefix.
+        
+        Args:
+            prefix: Prefix type ('market_data', 'session', etc.)
+            key: The specific key to append
+            
+        Returns:
+            Full Redis key with prefix
+        """
+        prefix_attr = f"{prefix}_prefix"
+        if hasattr(self, prefix_attr):
+            return f"{getattr(self, prefix_attr)}{key}"
+        return f"candlestick:{prefix}:{key}"
+```
+
+The frozen dataclass ensures immutability while providing comprehensive settings for cache prefixes, TTLs, recovery mechanisms, and more.
+
+##### Assessment Configuration
+
+The module includes several nested configuration classes for the assessment system:
+
+```python
+@dataclass(frozen=True)
+class AssessmentConfig:
+    """Configuration for candlestick pattern assessments."""
+    questions_per_session: int = 10
+    max_questions_per_session: int = 20
+    time_limits: TimeLimits = field(default_factory=TimeLimits)
+    passing_score: PassingScore = field(default_factory=PassingScore)
+    rate_limits: RateLimits = field(default_factory=RateLimits)
+    adaptive_difficulty: AdaptiveDifficulty = field(default_factory=AdaptiveDifficulty)
+    scoring: ScoringSettings = field(default_factory=ScoringSettings)
+    session_expiry_seconds: int = 7200  # 2 hours
+    default_questions_per_session: int = 10
+```
+
+This includes sophisticated nested components like:
+
+1. **ScoringSettings**: Configures the scoring algorithm with weights for difficulty, time bonuses, and streaks
+2. **AdaptiveDifficulty**: Controls how question difficulty adjusts based on user performance
+3. **TimeLimits**: Sets time constraints for questions based on difficulty
+4. **PassingScore**: Defines requirements for passing an assessment
+5. **RateLimits**: Prevents abuse of the assessment system
+
+##### Pattern Definitions
+
+The module provides comprehensive pattern definitions organized by category:
+
+```python
+CANDLESTICK_PATTERNS: Final[Mapping[PatternCategory, Sequence[str]]] = {
+    PatternCategory.SINGLE: [
+        "Doji",
+        "Hammer",
+        "Inverted Hammer",
+        "Shooting Star",
+        "Spinning Top",
+        "Marubozu",
+        "Dragonfly Doji",
+        "Gravestone Doji",
+        "Long-Legged Doji"
+    ],
+    PatternCategory.DOUBLE: [
+        "Bullish Engulfing",
+        "Bearish Engulfing",
+        "Bullish Harami",
+        "Bearish Harami",
+        "Tweezer Top",
+        "Tweezer Bottom",
+        "Piercing Line",
+        "Dark Cloud Cover",
+        "Meeting Lines"
+    ],
+    # Additional categories omitted for brevity
+}
+```
+
+Each pattern includes a detailed educational description:
+
+```python
+PATTERN_DESCRIPTIONS: Final[Mapping[str, str]] = {
+    "Doji": "A Doji forms when the opening and closing prices are virtually equal. It represents market indecision, with its various forms (standard, dragonfly, gravestone, long-legged) indicating different nuances of market sentiment.",
+    
+    "Hammer": "The Hammer is a bullish reversal pattern that forms during a downtrend. It has a small real body at the upper end of the trading range and a long lower shadow at least twice the size of the body, indicating rejection of lower prices.",
+    
+    # Additional patterns omitted for brevity
+}
+```
+
+Patterns are also mapped to appropriate difficulty levels:
+
+```python
+DIFFICULTY_LEVELS: Final[Mapping[DifficultyLevel, Sequence[str]]] = {
+    DifficultyLevel.BEGINNER: [
+        "Doji",
+        "Hammer",
+        "Shooting Star",
+        "Bullish Engulfing",
+        "Bearish Engulfing"
+    ],
+    # Additional levels omitted for brevity
+}
+```
+
+##### Environment Configuration
+
+The module implements robust environment variable handling:
+
+```python
+def _get_env_value(name: str, default: Any = None, prefix: str = "CANDLESTICK_") -> Any:
+    """
+    Get an environment variable value with a standard prefix.
+    
+    Args:
+        name: Variable name without prefix
+        default: Default value if not found
+        prefix: Optional prefix to prepend to the name
+        
+    Returns:
+        Environment variable value or default
+    """
+    return os.environ.get(f"{prefix}{name}", default)
+```
+
+Specialized functions handle different data types:
+- `_get_env_bool`: Boolean values
+- `_get_env_int`: Integer values
+- `_get_env_float`: Float values
+- `_get_env_list`: List values (comma-separated)
+- `_get_env_json`: JSON-formatted values
+
+##### Helper Functions
+
+The module provides numerous utility functions:
+
+```python
+@lru_cache(maxsize=32)
+def get_patterns_by_category(category: Union[PatternCategory, str]) -> List[str]:
+    """
+    Get patterns for a specific category.
+    
+    Args:
+        category: PatternCategory enum or string value
+    
+    Returns:
+        List of pattern names
+    
+    Raises:
+        PatternValidationError: If the category is invalid
+    """
+    try:
+        if isinstance(category, str):
+            cat = PatternCategory.from_string(category)
+        else:
+            cat = category
+            
+        patterns = CANDLESTICK_PATTERNS.get(cat, [])
+        return list(patterns)  # Return a copy to prevent modification
+    except ValueError as e:
+        raise PatternValidationError(f"Invalid pattern category: {e}")
+```
+
+Additional notable functions include:
+- `get_pattern_description`: Retrieves pattern descriptions with caching
+- `difficulty_to_level`: Converts numeric values to difficulty levels
+- `validate_pattern_name`: Ensures pattern validity
+- `suggest_pattern`: Provides fuzzy matching for invalid pattern names
+
+##### Configuration Validation
+
+The module includes comprehensive validation:
+
+```python
+def validate_configuration() -> Dict[str, List[str]]:
+    """
+    Validate the entire configuration for consistency.
+    
+    This function checks for:
+    - Pattern names consistency across categories
+    - Difficulty levels consistency
+    - Data provider configurations
+    - Assessment settings validity
+    
+    Returns:
+        Dictionary mapping section names to lists of warning messages
+    """
+    # Implementation checks:
+    # 1. Pattern name uniqueness across categories
+    # 2. All patterns have descriptions
+    # 3. All patterns are assigned to difficulty levels
+    # 4. Market data configuration is valid
+    # 5. Assessment settings are consistent
+```
+
+##### Configuration Export
+
+The module allows exporting configuration to JSON:
+
+```python
+def export_config_to_json() -> Dict[str, Any]:
+    """
+    Export the current configuration to a JSON-serializable dictionary.
+    
+    Returns:
+        Dictionary with all configuration values
+    """
+    config = {
+        "version": __version__,
+        "cache": asdict(CACHE_CONFIG),
+        "assessment": asdict(ASSESSMENT_CONFIG),
+        "market_data": dict(MARKET_DATA),
+        "patterns": {
+            "by_category": {
+                category.value: list(patterns) 
+                for category, patterns in CANDLESTICK_PATTERNS.items()
+            },
+            "by_difficulty": {
+                difficulty.value: list(patterns) 
+                for difficulty, patterns in DIFFICULTY_LEVELS.items()
+            },
+            "total_count": len(_ALL_PATTERNS)
+        }
+    }
+    
+    return config
+```
+
+#### Technical Implementation Highlights
+
+1. **Immutability**
+   - Uses `dataclass(frozen=True)` for immutable configuration classes
+   - Marks constants with `Final` to prevent modification
+   - Returns copies of lists to prevent accidental modification
+
+2. **Performance Optimization**
+   - Uses `lru_cache` for expensive operations
+   - Pre-computes lookup dictionaries for fast pattern access
+   - Implements efficient pattern name normalization
+
+3. **Type Safety**
+   - Uses `TypedDict` for structured dictionary types
+   - Implements comprehensive type annotations
+   - Uses `Final` type annotations for constants
+
+4. **Error Handling**
+   - Defines custom exception types for different error scenarios
+   - Includes specific error messages with suggestions
+   - Validates configurations at multiple levels
+
+5. **Security**
+   - Retrieves sensitive values from environment variables
+   - Provides safe default values
+   - Supports redaction of sensitive information
+
+#### Environment Variable Documentation
+
+The module provides detailed documentation for available environment variables:
+
+```
+Environment Variable Configuration
+
+The following environment variables can be used to customize the configuration:
+
+Cache Configuration:
+- CANDLESTICK_CACHE_MARKET_DATA_PREFIX: Prefix for market data cache keys
+- CANDLESTICK_CACHE_SESSION_PREFIX: Prefix for session cache keys
+- CANDLESTICK_CACHE_QUESTION_PREFIX: Prefix for question cache keys
+- CANDLESTICK_CACHE_DEFAULT_TTL: Default TTL in seconds (default: 3600)
+- CANDLESTICK_CACHE_SESSION_TTL: Session TTL in seconds (default: 3600)
+- CANDLESTICK_CACHE_MARKET_DATA_TTL: Market data TTL in seconds (default: 21600)
+- CANDLESTICK_CACHE_MAX_RECOVERY_ATTEMPTS: Maximum recovery attempts (default: 3)
+- CANDLESTICK_CACHE_RECOVERY_RETRY_DELAY: Recovery retry delay in seconds (default: 5)
+
+Assessment Configuration:
+- CANDLESTICK_ASSESSMENT_QUESTIONS_PER_SESSION: Default questions per session (default: 10)
+- CANDLESTICK_ASSESSMENT_MAX_QUESTIONS: Maximum questions per session (default: 20)
+- CANDLESTICK_ASSESSMENT_SESSION_EXPIRY: Session expiry in seconds (default: 7200)
+
+API Keys:
+- ALPHAVANTAGE_API_KEY: API key for Alpha Vantage market data
+- FINNHUB_API_KEY: API key for Finnhub market data
+
+Feature Flags:
+- CANDLESTICK_ENABLE_ADAPTIVE_DIFFICULTY: Enable/disable adaptive difficulty (default: TRUE)
+- CANDLESTICK_ENABLE_PERFORMANCE_TRACKING: Enable/disable performance tracking (default: TRUE)
+```
+
+#### Usage Examples
+
+The configuration module is used throughout the system in various ways:
+
+1. **Retrieving Pattern Information**
+```python
+# Get patterns for difficulty level
+beginner_patterns = get_patterns_by_difficulty(DifficultyLevel.BEGINNER)
+
+# Get pattern description
+hammer_desc = get_pattern_description("Hammer")
+
+# Validate user input
+if validate_pattern_name(user_input):
+    # Process valid pattern
+else:
+    # Suggest alternative
+    suggestion = suggest_pattern(user_input)
+```
+
+2. **Assessment Configuration**
+```python
+# Use adaptive difficulty settings
+if ASSESSMENT_CONFIG.adaptive_difficulty.enabled:
+    new_difficulty = ASSESSMENT_CONFIG.adaptive_difficulty.calculate_difficulty(
+        base_difficulty=0.5,  # Medium difficulty
+        user_performance=0.8   # User performing well
+    )
+
+# Calculate score for an answer
+score = ASSESSMENT_CONFIG.scoring.calculate_score(
+    is_correct=True,
+    difficulty=0.75,  # Hard difficulty
+    time_ratio=0.4,   # Used 40% of available time
+    streak=3          # Current streak of 3 correct answers
+)
+
+# Get adjusted time limit for question
+time_limit = ASSESSMENT_CONFIG.time_limits.get_adjusted_time(difficulty=0.75)
+```
+
+3. **Caching Operations**
+```python
+# Create cache key for market data
+market_data_key = CACHE_CONFIG.get_full_key("market_data", "AAPL:1h:100")
+
+# Get TTL for question cache
+question_ttl = CACHE_CONFIG.question_ttl
+```
+
+4. **Environment Configuration**
+```python
+# Create an instance with environment overrides
+cache_config = CacheConfig(
+    market_data_ttl=_get_env_int("CACHE_MARKET_DATA_TTL", 21600),
+    # Additional parameters with environment overrides
+)
+```
+
+#### Key Benefits
+
+The configuration system provides several key benefits:
+
+1. **Centralized Configuration**: All settings in one place for easy management
+2. **Flexibility**: Environment variable overrides for different environments
+3. **Type Safety**: Comprehensive typing for error prevention
+4. **Validation**: Built-in validation to ensure configuration consistency
+5. **Performance**: Optimized for fast access with caching and pre-computed lookups
+6. **Documentation**: Self-documenting with detailed docstrings and type hints
+7. **Extensibility**: Designed for easy extension with new patterns or settings
+
+The `candlestick_config.py` module serves as a robust foundation for the entire assessment system, ensuring consistent behavior, reliable configuration, and flexible customization options across all environments.

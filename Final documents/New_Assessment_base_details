@@ -1,0 +1,981 @@
+# TradeIQ Assessment System Architecture
+
+## Overview
+
+TradeIQ is an AI-powered platform revolutionizing financial market education through dynamic, adaptive assessments. The system's architecture follows domain-driven design principles with a modular, layered approach that ensures separation of concerns, maintainability, and extensibility.
+
+The assessment system serves as the core engine of the platform, providing infrastructure for generating questions, evaluating user answers, tracking performance, and adapting difficulty based on user skills. It's designed to support multiple assessment types (candlestick patterns, market fundamentals, and market psychology) within a unified framework.
+
+This document provides a comprehensive overview of the assessment system's base architecture, detailing each component, their interactions, and the design patterns employed.
+
+## Core Architectural Components
+
+The assessment system is built around five primary components:
+
+1. **Models**: Define the data structures and business entities
+2. **Repositories**: Provide data access and persistence
+3. **Services**: Implement core business logic
+4. **Controllers**: Expose API endpoints and handle requests
+5. **Tasks**: Execute background operations
+
+Each component is designed with clear interfaces and abstractions, allowing for type-safe, maintainable code with proper dependency injection.
+
+## Base Models (models.py)
+
+The models module defines the core domain entities used throughout the assessment system.
+
+### Key Enums
+
+#### `AssessmentType`
+```python
+class AssessmentType(enum.Enum):
+    """Types of assessment supported by the system."""
+    CANDLESTICK = "candlestick"
+    MARKET_FUNDAMENTAL = "market_fundamental"
+    MARKET_PSYCHOLOGY = "market_psychology"
+    TECHNICAL_ANALYSIS = "technical_analysis"
+    RISK_MANAGEMENT = "risk_management"
+```
+
+#### `QuestionDifficulty`
+```python
+class QuestionDifficulty(enum.Enum):
+    """Difficulty levels for assessment questions."""
+    VERY_EASY = "very_easy"
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
+    VERY_HARD = "very_hard"
+    
+    @classmethod
+    def from_numeric(cls, value: int) -> 'QuestionDifficulty':
+        """Convert a numeric value (1-5) to a difficulty level."""
+        # Implementation...
+```
+
+#### `SessionStatus`
+```python
+class SessionStatus(enum.Enum):
+    """Status of an assessment session."""
+    CREATED = "created"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    EXPIRED = "expired"
+    ABANDONED = "abandoned"
+```
+
+### Core Domain Entities
+
+#### `BaseQuestion`
+The foundation for all assessment questions, providing common attributes and behavior.
+
+```python
+@dataclass
+class BaseQuestion(SerializableMixin):
+    """Base class for all assessment questions."""
+    
+    id: str
+    question_type: str
+    question_text: str
+    difficulty: QuestionDifficulty
+    topics: List[str]
+    subtopics: Optional[List[str]] = None
+    created_at: datetime.datetime = field(default_factory=datetime.datetime.utcnow)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    answer_options: Optional[Dict[str, Any]] = None
+    
+    def get_correct_answer(self) -> Any:
+        """Get the correct answer for this question."""
+        raise NotImplementedError("Subclasses must implement get_correct_answer")
+    
+    def evaluate_answer(self, user_answer: Any) -> 'AnswerEvaluation':
+        """Evaluate a user's answer to this question."""
+        raise NotImplementedError("Subclasses must implement evaluate_answer")
+```
+
+Key features:
+- Unique identifier
+- Question type and text
+- Difficulty level
+- Topics and subtopics for categorization
+- Extensible metadata for assessment-specific attributes
+- Abstract methods for answer evaluation that must be implemented by subclasses
+
+#### `AnswerEvaluation`
+Represents the evaluation of a user's answer to a question.
+
+```python
+@dataclass
+class AnswerEvaluation(SerializableMixin):
+    """Evaluation of a user's answer to a question."""
+    
+    is_correct: bool
+    score: float  # 0 to 1
+    confidence: float  # 0 to 1
+    feedback: str
+    explanation: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+```
+
+Key features:
+- Binary correctness indicator
+- Numeric score (supporting partial credit)
+- Confidence level of the evaluation
+- Textual feedback and explanation
+- Extensible metadata for additional evaluation details
+
+#### `UserAnswer`
+Records a user's answer to a question with timing and evaluation data.
+
+```python
+@dataclass
+class UserAnswer(SerializableMixin):
+    """Records a user's answer to a question."""
+    
+    question_id: str
+    answer_value: Any
+    timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
+    time_taken_ms: Optional[int] = None
+    evaluation: Optional[AnswerEvaluation] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+```
+
+#### `AssessmentSession`
+Represents an assessment session for a user, tracking questions, answers, and progress.
+
+```python
+@dataclass
+class AssessmentSession(SerializableMixin):
+    """Represents an assessment session for a user."""
+    
+    id: str
+    assessment_type: AssessmentType
+    user_id: str
+    questions: List[str]  # List of question IDs
+    current_question_index: int = 0
+    user_answers: List[Dict[str, Any]] = field(default_factory=list)
+    status: SessionStatus = SessionStatus.IN_PROGRESS
+    created_at: datetime.datetime = field(default_factory=datetime.datetime.utcnow)
+    completed_at: Optional[datetime.datetime] = None
+    settings: Dict[str, Any] = field(default_factory=dict)
+    
+    # Key methods
+    def get_current_question_id(self) -> Optional[str]:
+        """Get the ID of the current question."""
+        # Implementation...
+    
+    def record_answer(self, answer_data: Dict[str, Any]) -> None:
+        """Record a user's answer for the current question."""
+        # Implementation...
+    
+    def next_question(self) -> Optional[str]:
+        """Move to the next question and return its ID."""
+        # Implementation...
+    
+    def previous_question(self) -> Optional[str]:
+        """Move to the previous question and return its ID."""
+        # Implementation...
+    
+    def complete(self) -> None:
+        """Mark the session as completed."""
+        # Implementation...
+    
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get user performance metrics for this session."""
+        # Implementation...
+```
+
+Key features:
+- Unique identifier
+- Assessment type and user reference
+- List of question IDs with current position
+- User answers with evaluations
+- Session status and timing information
+- Navigation methods (next/previous question)
+- Performance metric calculations
+
+## Repositories (repositories.py)
+
+The repositories module defines abstract interfaces for data access, following the Repository pattern to decouple data access from business logic.
+
+### `QuestionRepository`
+Abstract repository for managing assessment questions.
+
+```python
+class QuestionRepository(Generic[T_Question]):
+    """Abstract repository interface for managing assessment questions."""
+    
+    @property
+    @abstractmethod
+    def domain_type(self) -> str:
+        """Get the domain type identifier for this repository."""
+        pass
+    
+    @abstractmethod
+    async def get_by_id(self, question_id: str) -> Optional[T_Question]:
+        """Retrieve a question by its ID."""
+        pass
+    
+    @abstractmethod
+    async def save(self, question: T_Question) -> bool:
+        """Save a question to the repository."""
+        pass
+    
+    @abstractmethod
+    async def delete(self, question_id: str) -> bool:
+        """Delete a question from the repository."""
+        pass
+    
+    @abstractmethod
+    async def find_by_difficulty(
+        self, 
+        difficulty: str, 
+        limit: int = 10, 
+        offset: int = 0
+    ) -> List[T_Question]:
+        """Find questions matching the specified difficulty."""
+        pass
+    
+    @abstractmethod
+    async def find_by_topics(
+        self, 
+        topics: List[str], 
+        limit: int = 10, 
+        offset: int = 0
+    ) -> List[T_Question]:
+        """Find questions related to the specified topics."""
+        pass
+    
+    @abstractmethod
+    async def find_by_criteria(
+        self,
+        criteria: Dict[str, Any],
+        limit: int = 10,
+        offset: int = 0
+    ) -> List[T_Question]:
+        """Find questions matching the specified criteria."""
+        pass
+```
+
+Notable features:
+- Generic type parameter for specific question types
+- Async methods for non-blocking database operations
+- Comprehensive CRUD operations (Create, Read, Update, Delete)
+- Query methods with filtering, pagination, and sorting
+- Domain-specific naming and organization
+
+### `SessionRepository`
+Abstract repository for managing assessment sessions.
+
+```python
+class SessionRepository(Generic[T_Session]):
+    """Abstract repository interface for managing assessment sessions."""
+    
+    # Similar CRUD methods as QuestionRepository
+    
+    @abstractmethod
+    async def find_by_user_id(
+        self, 
+        user_id: str,
+        limit: int = 10,
+        offset: int = 0,
+        status: Optional[str] = None
+    ) -> List[T_Session]:
+        """Find sessions for a specific user."""
+        pass
+    
+    @abstractmethod
+    async def find_by_date_range(
+        self,
+        user_id: str,
+        start_date: datetime.datetime,
+        end_date: datetime.datetime,
+        limit: int = 10,
+        offset: int = 0
+    ) -> List[T_Session]:
+        """Find sessions within a specific date range."""
+        pass
+    
+    @abstractmethod
+    async def get_latest_session(self, user_id: str) -> Optional[T_Session]:
+        """Get the most recent session for a user."""
+        pass
+    
+    @abstractmethod
+    async def get_user_stats(self, user_id: str) -> Dict[str, Any]:
+        """Get session statistics for a user."""
+        pass
+```
+
+### `AssessmentRepository`
+Abstract repository that coordinates access to question and session repositories.
+
+```python
+class AssessmentRepository(ABC):
+    """Abstract repository interface for assessment data access."""
+    
+    @property
+    @abstractmethod
+    def question_repository(self) -> QuestionRepository:
+        """Get the repository for managing assessment questions."""
+        pass
+    
+    @property
+    @abstractmethod
+    def session_repository(self) -> SessionRepository:
+        """Get the repository for managing assessment sessions."""
+        pass
+    
+    @abstractmethod
+    async def get_questions_for_session(
+        self,
+        difficulty: Optional[str] = None,
+        topics: Optional[List[str]] = None,
+        count: int = 10,
+        user_id: Optional[str] = None
+    ) -> List[Any]:
+        """Get questions for a new assessment session."""
+        pass
+    
+    @abstractmethod
+    async def get_user_performance(self, user_id: str) -> Dict[str, Any]:
+        """Get overall performance metrics for a user across all sessions."""
+        pass
+    
+    @abstractmethod
+    async def get_difficulty_distribution(self, user_id: str) -> Dict[str, float]:
+        """Get the distribution of question difficulties appropriate for a user."""
+        pass
+```
+
+## Services (services.py)
+
+The services module implements the core business logic of the assessment system, following the Service pattern to encapsulate complex operations.
+
+### `QuestionGenerator`
+Generates assessment questions based on various criteria.
+
+```python
+class QuestionGenerator(Generic[T_Question], ABC):
+    """Abstract interface for question generation in assessments."""
+    
+    @abstractmethod
+    async def generate_random_question(
+        self,
+        difficulty: Optional[str] = None,
+        topic: Optional[str] = None
+    ) -> T_Question:
+        """Generate a random question with optional constraints."""
+        pass
+    
+    @abstractmethod
+    async def generate_questions_batch(
+        self,
+        count: int,
+        difficulty: Optional[str] = None,
+        topics: Optional[List[str]] = None,
+        shuffle: bool = True
+    ) -> List[T_Question]:
+        """Generate a batch of questions with optional constraints."""
+        pass
+    
+    @abstractmethod
+    async def generate_adaptive_questions(
+        self,
+        user_id: str,
+        count: int,
+        topics: Optional[List[str]] = None
+    ) -> List[T_Question]:
+        """Generate questions adapted to a user's skill level."""
+        pass
+    
+    @abstractmethod
+    async def generate_spaced_repetition_questions(
+        self,
+        user_id: str,
+        count: int
+    ) -> List[T_Question]:
+        """Generate questions following spaced repetition principles."""
+        pass
+```
+
+Key features:
+- Type-safe question generation with generic typing
+- Support for random, batched, and adaptive question creation
+- Integration with spaced repetition for optimized learning
+- Topic and difficulty constraints
+
+### `AnswerEvaluator`
+Evaluates user answers and provides feedback.
+
+```python
+class AnswerEvaluator(Generic[T_Question, T_Evaluation], ABC):
+    """Abstract interface for evaluating answers in assessments."""
+    
+    @abstractmethod
+    async def evaluate_answer(
+        self,
+        question: T_Question,
+        user_answer: Any
+    ) -> T_Evaluation:
+        """Evaluate a user's answer to a question."""
+        pass
+    
+    @abstractmethod
+    async def evaluate_session_answers(
+        self,
+        questions: List[T_Question],
+        user_answers: List[Any]
+    ) -> List[T_Evaluation]:
+        """Evaluate all answers for a session."""
+        pass
+    
+    @abstractmethod
+    async def evaluate_partial_answer(
+        self,
+        question: T_Question,
+        partial_answer: Any
+    ) -> Dict[str, Any]:
+        """Evaluate a partial or in-progress answer."""
+        pass
+    
+    @abstractmethod
+    async def generate_feedback(
+        self,
+        question: T_Question,
+        user_answer: Any,
+        evaluation: T_Evaluation
+    ) -> str:
+        """Generate detailed feedback for an answer."""
+        pass
+```
+
+### `ExplanationGenerator`
+Generates detailed explanations for questions and answers.
+
+```python
+class ExplanationGenerator(Generic[T_Question], ABC):
+    """Abstract interface for generating explanations in assessments."""
+    
+    @abstractmethod
+    async def explain_question(self, question: T_Question) -> str:
+        """Generate an explanation of the question itself."""
+        pass
+    
+    @abstractmethod
+    async def explain_correct_answer(self, question: T_Question) -> str:
+        """Generate an explanation of the correct answer."""
+        pass
+    
+    @abstractmethod
+    async def explain_user_answer(
+        self,
+        question: T_Question,
+        user_answer: Any,
+        is_correct: bool
+    ) -> str:
+        """Generate an explanation of the user's answer."""
+        pass
+    
+    @abstractmethod
+    async def explain_topic(self, topic: str, difficulty: Optional[str] = None) -> Dict[str, Any]:
+        """Generate an explanation of a topic."""
+        pass
+    
+    @abstractmethod
+    async def generate_learning_resources(
+        self,
+        question: T_Question,
+        was_correct: bool
+    ) -> List[Dict[str, Any]]:
+        """Generate learning resources related to a question."""
+        pass
+```
+
+### `PerformanceAnalyzer`
+Analyzes user performance and provides insights.
+
+```python
+class PerformanceAnalyzer(ABC):
+    """Abstract interface for analyzing user performance in assessments."""
+    
+    @abstractmethod
+    async def track_session_performance(self, session_id: str) -> bool:
+        """Track performance for a completed assessment session."""
+        pass
+    
+    @abstractmethod
+    async def track_answer_performance(
+        self,
+        user_id: str,
+        question_id: str,
+        evaluation: Dict[str, Any],
+        time_taken_ms: Optional[int] = None
+    ) -> bool:
+        """Track performance for a single answer."""
+        pass
+    
+    @abstractmethod
+    async def get_user_performance(self, user_id: str) -> Dict[str, Any]:
+        """Get overall performance metrics for a user."""
+        pass
+    
+    @abstractmethod
+    async def get_topic_performance(
+        self,
+        user_id: str,
+        topic: str
+    ) -> Dict[str, Any]:
+        """Get performance metrics for a user on a specific topic."""
+        pass
+    
+    @abstractmethod
+    async def get_difficulty_engine(self, user_id: str) -> Dict[str, Any]:
+        """Get the adaptive difficulty engine configuration for a user."""
+        pass
+    
+    @abstractmethod
+    async def get_improvement_recommendations(
+        self,
+        user_id: str,
+        limit: int = 3
+    ) -> List[Dict[str, Any]]:
+        """Get personalized recommendations for improvement."""
+        pass
+```
+
+### `AssessmentService`
+Orchestrates the entire assessment process, acting as a facade for client code.
+
+```python
+class AssessmentService(Generic[T_Question, T_Session], ABC):
+    """Abstract interface for core assessment functionality."""
+    
+    # Component properties
+    @property
+    @abstractmethod
+    def question_repository(self) -> QuestionRepository[T_Question]:
+        """Get the repository for managing questions."""
+        pass
+    
+    @property
+    @abstractmethod
+    def session_repository(self) -> SessionRepository[T_Session]:
+        """Get the repository for managing sessions."""
+        pass
+    
+    @property
+    @abstractmethod
+    def question_generator(self) -> QuestionGenerator[T_Question]:
+        """Get the generator for creating questions."""
+        pass
+    
+    @property
+    @abstractmethod
+    def answer_evaluator(self) -> AnswerEvaluator[T_Question, T_Evaluation]:
+        """Get the evaluator for assessing answers."""
+        pass
+    
+    @property
+    @abstractmethod
+    def explanation_generator(self) -> ExplanationGenerator[T_Question]:
+        """Get the generator for creating explanations."""
+        pass
+    
+    @property
+    @abstractmethod
+    def performance_analyzer(self) -> PerformanceAnalyzer:
+        """Get the analyzer for tracking performance."""
+        pass
+    
+    # Key operations
+    @abstractmethod
+    async def create_session(
+        self,
+        user_id: str,
+        question_count: int = 10,
+        topics: Optional[List[str]] = None,
+        difficulty: Optional[str] = None,
+        settings: Optional[Dict[str, Any]] = None
+    ) -> T_Session:
+        """Create a new assessment session."""
+        pass
+    
+    @abstractmethod
+    async def submit_answer(
+        self,
+        session_id: str,
+        question_id: str,
+        answer: Any,
+        time_taken_ms: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Submit an answer to a question in a session."""
+        pass
+    
+    @abstractmethod
+    async def complete_session(self, session_id: str) -> Dict[str, Any]:
+        """Complete an assessment session and process results."""
+        pass
+    
+    @abstractmethod
+    async def get_explanation(
+        self,
+        question_id: str,
+        user_answer: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Get an explanation for a question and optionally an answer."""
+        pass
+```
+
+## Controllers (controllers.py)
+
+The controllers module defines the API layer for interacting with assessment services, handling HTTP requests and responses.
+
+### `BaseAssessmentController`
+Abstract controller for assessment APIs.
+
+```python
+class BaseAssessmentController(Generic[T, S], ABC):
+    """Abstract base controller for assessment APIs."""
+    
+    @property
+    @abstractmethod
+    def service(self) -> Any:
+        """Get the assessment service for this controller."""
+        pass
+    
+    @abstractmethod
+    async def create_session(
+        self,
+        user_id: str,
+        question_count: int = 10,
+        topics: Optional[List[str]] = None,
+        difficulty: Optional[str] = None,
+        settings: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a new assessment session."""
+        pass
+    
+    @abstractmethod
+    async def get_session_question(
+        self,
+        session_id: str,
+        question_index: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Get the current or specified question in a session."""
+        pass
+    
+    @abstractmethod
+    async def submit_answer(
+        self,
+        session_id: str,
+        question_id: str,
+        answer: Any,
+        time_taken_ms: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Submit an answer to a question in a session."""
+        pass
+    
+    @abstractmethod
+    async def next_question(self, session_id: str) -> Dict[str, Any]:
+        """Move to the next question in a session."""
+        pass
+    
+    @abstractmethod
+    async def complete_session(self, session_id: str) -> Dict[str, Any]:
+        """Complete an assessment session."""
+        pass
+    
+    @abstractmethod
+    async def get_user_performance(self, user_id: str) -> Dict[str, Any]:
+        """Get performance metrics for a user."""
+        pass
+    
+    @abstractmethod
+    def get_recommended_topics(self, user_id: str, count: int = 3) -> List[Dict[str, Any]]:
+        """Get recommended topics for a user to focus on based on performance."""
+        pass
+```
+
+## Tasks (tasks.py)
+
+The tasks module provides background processing capabilities for long-running operations, implemented using a task queue system.
+
+### Key Task Functions
+
+```python
+@task(
+    queue="assessments",
+    tags=["assessment", "sessions"],
+    description="Create a new assessment session for a user",
+    retry=True,
+    max_retries=3,
+    retry_delay=5
+)
+async def create_assessment_session(
+    user_id: str,
+    assessment_type: str,
+    difficulty: str = "adaptive",
+    topics: Optional[List[str]] = None,
+    question_count: int = 10,
+    time_limit_minutes: Optional[int] = None,
+    settings: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Create a new assessment session for a user."""
+    # Implementation...
+
+@task(
+    queue="assessments",
+    tags=["assessment", "questions"],
+    description="Generate questions for an assessment session",
+    retry=True,
+    max_retries=3,
+    retry_delay=10
+)
+async def generate_session_questions(
+    session_id: str,
+    assessment_type: str,
+    difficulty: str,
+    topics: Optional[List[str]] = None,
+    question_count: int = 10
+) -> Dict[str, Any]:
+    """Generate questions for an assessment session."""
+    # Implementation...
+
+@task(
+    queue="assessments",
+    tags=["assessment", "evaluation"],
+    description="Evaluate a user's answer to an assessment question",
+    retry=True,
+    max_retries=3,
+    retry_delay=5
+)
+async def evaluate_user_answer(
+    session_id: str,
+    question_id: str,
+    user_answer: Any,
+    user_id: str,
+    timing_ms: Optional[int] = None
+) -> Dict[str, Any]:
+    """Evaluate a user's answer to an assessment question."""
+    # Implementation...
+
+@task(
+    queue="assessments",
+    tags=["assessment", "performance"],
+    description="Update user performance metrics",
+    retry=True,
+    max_retries=3,
+    retry_delay=5
+)
+async def update_user_performance(
+    user_id: str,
+    question_id: str,
+    is_correct: bool,
+    difficulty: str,
+    topic: str,
+    timing_ms: Optional[int] = None
+) -> Dict[str, Any]:
+    """Update performance metrics for a user based on their answer."""
+    # Implementation...
+
+@task(
+    queue="assessments",
+    tags=["assessment", "sessions"],
+    description="Complete an assessment session and process results",
+    retry=True,
+    max_retries=3,
+    retry_delay=10
+)
+async def complete_assessment_session(
+    session_id: str,
+    user_id: str
+) -> Dict[str, Any]:
+    """Complete an assessment session and process the results."""
+    # Implementation...
+
+@task(
+    queue="reporting",
+    tags=["assessment", "reporting"],
+    description="Generate a summary report for an assessment session",
+    retry=True,
+    max_retries=3,
+    retry_delay=15
+)
+async def generate_session_summary(
+    session_id: str,
+    user_id: str,
+    results: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Generate a detailed summary report for an assessment session."""
+    # Implementation...
+```
+
+## Assessment System Flow
+
+The assessment system follows a well-defined flow of operations:
+
+1. **Session Creation**:
+   - User initiates an assessment
+   - `AssessmentService.create_session()` creates a new session
+   - `create_assessment_session` task generates questions asynchronously
+   - Session with questions is returned to the user
+
+2. **Question Presentation**:
+   - User receives a question from the session
+   - `AssessmentService.get_question()` retrieves question details
+   - Question is presented with appropriate rendering (e.g., charts for candlestick patterns)
+
+3. **Answer Submission**:
+   - User submits an answer
+   - `AssessmentService.submit_answer()` processes the answer
+   - `evaluate_user_answer` task evaluates the answer asynchronously
+   - Evaluation result is returned to the user
+   - `update_user_performance` task updates metrics asynchronously
+
+4. **Session Navigation**:
+   - User navigates to next/previous questions
+   - `AssessmentSession.next_question()` or `previous_question()` updates position
+   - New question is presented to the user
+
+5. **Session Completion**:
+   - User completes all questions or ends the session
+   - `AssessmentService.complete_session()` finalizes the session
+   - `complete_assessment_session` task processes results asynchronously
+   - `generate_session_summary` task creates a report asynchronously
+   - Results and performance metrics are presented to the user
+
+6. **Performance Analysis**:
+   - User views performance metrics
+   - `PerformanceAnalyzer.get_user_performance()` retrieves metrics
+   - Metrics are presented with visualizations and recommendations
+
+## Design Patterns and Principles
+
+The assessment system employs several design patterns and principles:
+
+### 1. Repository Pattern
+- Separates data access logic from business logic
+- Provides a collection-like interface for domain objects
+- Enables easy substitution of data sources (e.g., SQL, NoSQL, in-memory)
+
+### 2. Service Layer Pattern
+- Defines application's boundary with a set of operations
+- Coordinates the application's response to each operation
+- Encapsulates domain logic and orchestrates repositories
+
+### 3. Domain Model Pattern
+- Places business logic primarily in domain objects (entities, value objects)
+- Rich domain models with behavior, not just data containers
+- Enforces invariants and business rules
+
+### 4. Abstract Factory Pattern
+- Provides interfaces for creating families of related objects
+- Concrete implementations create specific object types
+- Enables consistent creation of compatible objects
+
+### 5. Strategy Pattern
+- Defines a family of algorithms and makes them interchangeable
+- Used for question generation, answer evaluation, and difficulty adaptation
+- Allows for dynamic selection of strategies based on context
+
+### 6. Observer Pattern
+- Implements event-based communication between components
+- Used for performance tracking and metrics updates
+- Enables loose coupling between interdependent components
+
+### 7. Command Pattern
+- Encapsulates requests as objects with all necessary information
+- Used in the tasks module for background processing
+- Supports operations like retrying, queueing, and scheduling
+
+### SOLID Principles
+- **Single Responsibility**: Each class has one reason to change
+- **Open/Closed**: Classes are open for extension but closed for modification
+- **Liskov Substitution**: Subtypes can be used in place of their base types
+- **Interface Segregation**: Clients depend only on methods they use
+- **Dependency Inversion**: High-level modules depend on abstractions
+
+## Extending the Assessment System
+
+The assessment system is designed for extension through inheritance and composition. To implement a specific assessment type like candlestick pattern recognition:
+
+1. Define concrete question types extending `BaseQuestion`:
+   ```python
+   class CandlestickPatternQuestion(BaseQuestion):
+       chart_data: List[Dict[str, Any]]
+       pattern_type: str
+       pattern_location: Optional[List[int]] = None
+       
+       def get_correct_answer(self) -> str:
+           return self.metadata.get("correct_pattern")
+       
+       def evaluate_answer(self, user_answer: str) -> AnswerEvaluation:
+           # Implementation...
+   ```
+
+2. Implement concrete repositories for data access:
+   ```python
+   class CandlestickQuestionRepository(QuestionRepository[CandlestickPatternQuestion]):
+       # Implementation...
+   
+   class CandlestickSessionRepository(SessionRepository[CandlestickPatternSession]):
+       # Implementation...
+   ```
+
+3. Implement concrete services for business logic:
+   ```python
+   class CandlestickPatternGenerator(QuestionGenerator[CandlestickPatternQuestion]):
+       # Implementation...
+   
+   class CandlestickAnswerEvaluator(AnswerEvaluator[CandlestickPatternQuestion, AnswerEvaluation]):
+       # Implementation...
+   ```
+
+4. Implement controllers for API access:
+   ```python
+   class CandlestickAssessmentController(BaseAssessmentController[CandlestickPatternQuestion, AssessmentSession]):
+       # Implementation...
+   ```
+
+## Best Practices for Implementation
+
+When implementing assessment components, follow these best practices:
+
+1. **Type Safety**:
+   - Use generic type parameters consistently
+   - Leverage Python's typing module for static type checking
+   - Define clear interfaces with proper type annotations
+
+2. **Error Handling**:
+   - Use specific exception types for different error cases
+   - Implement graceful degradation for non-critical failures
+   - Provide detailed error messages for debugging
+
+3. **Asynchronous Programming**:
+   - Use async/await for I/O-bound operations
+   - Avoid blocking the event loop with CPU-intensive tasks
+   - Implement proper cancellation and timeout handling
+
+4. **Testing**:
+   - Write unit tests for individual components
+   - Create integration tests for component interactions
+   - Use mocks and stubs for external dependencies
+
+5. **Performance Optimization**:
+   - Implement caching for expensive operations
+   - Use database optimization techniques (indexing, pagination)
+   - Offload heavy processing to background tasks
+
+6. **Maintainability**:
+   - Follow consistent naming conventions
+   - Document public APIs and complex logic
+   - Keep methods focused and cohesive
+
+## Conclusion
+
+The TradeIQ assessment system provides a robust foundation for creating engaging, adaptive financial market education. Its modular, layered architecture ensures separation of concerns, maintainability, and extensibility.
+
+By implementing concrete components for specific assessment types, the system can deliver a unified experience across different learning domains while tailoring the content and evaluation to each domain's unique characteristics.
+
+The combination of domain-driven design, SOLID principles, and proven design patterns creates a scalable, maintainable codebase that can evolve with changing requirements and growing user needs.

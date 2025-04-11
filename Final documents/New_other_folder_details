@@ -1,0 +1,458 @@
+# TradeIQ Supporting Infrastructure
+
+This document provides a comprehensive explanation of three critical infrastructure components in the TradeIQ platform: the Database Module, the Metrics Module, and the Realtime Module. Each of these components plays a vital role in supporting the core assessment functionality while ensuring performance, data persistence, analytics, and interactive user experiences.
+
+## Table of Contents
+
+1. [Database Module](#database-module)
+2. [Metrics Module](#metrics-module)
+3. [Realtime Module](#realtime-module)
+4. [Integration Between Components](#integration-between-components)
+
+## Database Module
+
+**Location**: `/backend/database`
+
+### Overview
+
+The Database Module is responsible for initializing and managing database connections throughout the TradeIQ platform. It provides a consistent, efficient, and thread-safe way to interact with the PostgreSQL database, leveraging SQLAlchemy's asynchronous capabilities for non-blocking database operations.
+
+### Key Components
+
+#### init_db.py
+
+This file contains the core functionality for database initialization and connection management:
+
+```python
+async def initialize_database() -> bool:
+    """Initialize the database schema and async connection pool."""
+    global async_engine, AsyncSessionLocal
+    
+    # Implementation that sets up SQLAlchemy async engine with connection pooling
+    # and runs database migrations with Alembic
+```
+
+```python
+async def get_async_db() -> AsyncSession:
+    """Dependency that provides an async database session."""
+    if AsyncSessionLocal is None:
+        raise RuntimeError("Database not initialized or initialization failed")
+        
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+```
+
+### Features
+
+1. **Asynchronous Database Access**:
+   - Uses SQLAlchemy's async capabilities through `sqlalchemy.ext.asyncio`
+   - Supports non-blocking database operations in FastAPI handlers
+   - Prevents database operations from blocking the event loop
+
+2. **Connection Pooling**:
+   - Implements `QueuePool` for efficient connection management
+   - Configurable pool size and overflow settings
+   - Automatic connection recycling to prevent connection issues
+   - Proper cleanup and disposal of stale connections
+
+3. **Database Migration Support**:
+   - Integrates with Alembic for schema migrations
+   - Automatically applies pending migrations during initialization
+   - Handles synchronous migration execution in an async context
+
+4. **Dependency Injection**:
+   - Provides the `get_async_db()` function as a FastAPI dependency
+   - Ensures proper session lifecycle management (commit, rollback, close)
+   - Simplifies database access in API endpoints
+
+5. **Error Handling**:
+   - Comprehensive error capturing and logging
+   - Proper resource cleanup in error scenarios
+   - Graceful degradation when database is unavailable
+
+### Usage Example
+
+```python
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from backend.database.init_db import get_async_db
+
+@app.get("/users/{user_id}")
+async def get_user(user_id: str, db: AsyncSession = Depends(get_async_db)):
+    # Use the session for database operations
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    return user
+```
+
+## Metrics Module
+
+**Location**: `/backend/metrics`
+
+### Overview
+
+The Metrics Module tracks and stores aggregated user performance data across assessment sessions. It provides a robust system for measuring user progress, calculating overall statistics, and storing performance metrics for later analysis and reporting.
+
+### Key Components
+
+#### models.py
+
+Defines the SQLAlchemy ORM model for storing user metrics:
+
+```python
+class UserMetrics(Base):
+    """Stores aggregated performance metrics for a user across assessments."""
+    __tablename__ = 'user_metrics'
+
+    user_id = Column(String(255), primary_key=True)
+    total_sessions_completed = Column(Integer, nullable=False, default=0)
+    total_questions_attempted = Column(Integer, nullable=False, default=0)
+    total_correct_answers = Column(Integer, nullable=False, default=0)
+    current_correct_streak = Column(Integer, nullable=False, default=0)
+    longest_correct_streak = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    last_updated_at = Column(DateTime, default=datetime.datetime.utcnow,
+                           onupdate=datetime.datetime.utcnow, nullable=False)
+    assessment_specific_metrics = Column(JSONB, nullable=True)
+```
+
+#### repository.py
+
+Provides data access methods for user metrics:
+
+```python
+class UserMetricsRepository:
+    """Provides asynchronous database operations for the UserMetrics model."""
+    
+    async def get_or_create_metrics(self, user_id: str) -> UserMetrics:
+        """Retrieves user metrics by user ID, creating a new record if one doesn't exist."""
+        # Implementation...
+    
+    async def update_metrics(self, user_metrics: UserMetrics) -> bool:
+        """Updates an existing user metrics record using the provided instance state."""
+        # Implementation...
+    
+    async def get_metrics(self, user_id: str) -> Optional[UserMetrics]:
+        """Retrieves user metrics by user ID."""
+        # Implementation...
+```
+
+#### service.py
+
+Implements business logic for managing user metrics:
+
+```python
+class UserMetricsService:
+    """Provides business logic for calculating and updating user aggregate metrics."""
+    
+    async def get_user_metrics(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves the latest metrics for a user."""
+        # Implementation...
+    
+    async def update_metrics_from_session(self, session: CandlestickSession) -> bool:
+        """Updates a user's aggregate metrics based on a completed assessment session."""
+        # Implementation that processes session performance and updates metrics
+```
+
+### Features
+
+1. **Aggregated Performance Metrics**:
+   - Tracks total questions attempted and correctly answered
+   - Calculates overall accuracy percentages
+   - Maintains streak information (current and longest)
+   - Stores assessment-specific metrics by assessment type
+
+2. **Asynchronous Data Access**:
+   - All database operations are asynchronous
+   - Non-blocking repository methods
+   - Proper error handling and transaction management
+
+3. **Session-Based Updates**:
+   - Processes completed assessment sessions
+   - Extracts performance data from session results
+   - Updates aggregate metrics based on session performance
+   - Maintains assessment-specific metric breakdowns
+
+4. **Flexible Storage Model**:
+   - Uses PostgreSQL JSONB type for flexible metric storage
+   - Supports arbitrary assessment-specific metrics
+   - Easily extensible for new metric types
+
+5. **Performance Calculations**:
+   - Helper methods for calculating derived metrics
+   - Accuracy calculations based on attempts and correct answers
+   - Streak tracking for consecutive correct answers
+
+### Usage Example
+
+```python
+from backend.metrics.service import UserMetricsService
+from backend.assessments.candlestick_patterns.candlestick_models import CandlestickSession
+
+async def process_completed_session(session_id: str):
+    # Get the completed session
+    session = await session_repository.get_by_id(session_id)
+    
+    # Update user metrics
+    await metrics_service.update_metrics_from_session(session)
+    
+    # Get updated metrics for response
+    user_metrics = await metrics_service.get_user_metrics(session.user_id)
+    return user_metrics
+```
+
+## Realtime Module
+
+**Location**: `/backend/realtime`
+
+### Overview
+
+The Realtime Module provides WebSocket-based real-time communication capabilities for the TradeIQ platform. It enables features like instant assessment feedback, live leaderboard updates, and real-time notifications, creating a more interactive and engaging user experience.
+
+### Key Components
+
+#### manager.py
+
+The core WebSocket connection manager:
+
+```python
+class WebSocketManager:
+    """WebSocket connection manager for handling real-time communication."""
+    
+    def __init__(self, redis_client: Optional[Redis] = None):
+        """Initialize the WebSocketManager."""
+        self.active_connections: Dict[str, WebSocket] = {}
+        self.connection_groups: Dict[str, Set[str]] = {}
+        self.user_connections: Dict[str, Set[str]] = {}
+        self.redis = redis_client
+        self.listeners: Dict[str, List[Callable]] = {}
+    
+    async def connect(self, websocket: WebSocket, user_id: Optional[str] = None) -> str:
+        """Accept a WebSocket connection and register it."""
+        # Implementation...
+    
+    async def disconnect(self, connection_id: str) -> None:
+        """Remove a WebSocket connection."""
+        # Implementation...
+    
+    async def broadcast_to_group(self, message: Any, group: str) -> int:
+        """Broadcast a message to a specific group of connections."""
+        # Implementation...
+    
+    # Additional methods for connection management and messaging
+```
+
+#### controllers.py
+
+Defines WebSocket endpoints and route handlers:
+
+```python
+@ws_router.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    manager: WebSocketManager = Depends(get_websocket_manager),
+    user: Optional[Dict[str, Any]] = Depends(get_user_from_token)
+):
+    """Main WebSocket endpoint for general purpose connections."""
+    # Implementation...
+
+@ws_router.websocket("/ws/assessment/{assessment_id}")
+async def assessment_websocket_endpoint(
+    websocket: WebSocket,
+    assessment_id: str = Path(...),
+    manager: WebSocketManager = Depends(get_websocket_manager),
+    user: Optional[Dict[str, Any]] = Depends(get_user_from_token)
+):
+    """WebSocket endpoint for assessment-specific real-time updates."""
+    # Implementation...
+
+@ws_router.websocket("/ws/leaderboard/{board_id}")
+async def leaderboard_websocket_endpoint(
+    websocket: WebSocket,
+    board_id: str = Path(...),
+    manager: WebSocketManager = Depends(get_websocket_manager),
+    user: Optional[Dict[str, Any]] = Depends(get_user_from_token)
+):
+    """WebSocket endpoint for leaderboard real-time updates."""
+    # Implementation...
+```
+
+#### helpers.py
+
+Provides utility functions for sending WebSocket messages:
+
+```python
+async def send_user_notification(
+    app: FastAPI, 
+    user_id: str, 
+    notification_type: str, 
+    data: Dict[str, Any]
+) -> bool:
+    """Send a real-time notification to a specific user."""
+    # Implementation...
+
+async def send_assessment_update(
+    app: FastAPI,
+    assessment_id: str,
+    update_type: str,
+    data: Dict[str, Any],
+    user_id: Optional[str] = None
+) -> bool:
+    """Send a real-time update for an assessment."""
+    # Implementation...
+
+async def update_leaderboard(
+    app: FastAPI,
+    board_id: str,
+    update_data: Union[Dict[str, Any], List[Dict[str, Any]]]
+) -> bool:
+    """Send a real-time update to a leaderboard."""
+    # Implementation...
+```
+
+### Features
+
+1. **Connection Management**:
+   - Tracks active WebSocket connections
+   - Associates connections with authenticated users
+   - Organizes connections into groups for targeted messaging
+   - Proper cleanup on disconnection
+
+2. **Group-Based Messaging**:
+   - Supports adding connections to named groups
+   - Enables broadcasting to specific groups
+   - Allows dynamic group membership changes
+   - Assessment-specific and leaderboard-specific groups
+
+3. **Authentication Integration**:
+   - Token-based authentication for WebSocket connections
+   - User identification and association
+   - Support for both authenticated and anonymous connections
+   - Authorization for sensitive endpoints
+
+4. **Redis Pub/Sub for Scaling**:
+   - Multi-server support through Redis pub/sub
+   - Distributed WebSocket event propagation
+   - Cross-server real-time updates
+   - Scalable architecture for high user loads
+
+5. **Specialized Endpoints**:
+   - General-purpose WebSocket for notifications
+   - Assessment-specific WebSockets for live feedback
+   - Leaderboard WebSockets for score updates
+   - Custom event handling and routing
+
+6. **Helper Functions**:
+   - Easy-to-use API for sending notifications
+   - Functions for assessment-specific updates
+   - Leaderboard update utilities
+   - System-wide announcement capabilities
+
+### Usage Example
+
+```python
+from fastapi import FastAPI
+from backend.realtime.helpers import send_assessment_update
+
+async def process_answer(app: FastAPI, session_id: str, question_id: str, is_correct: bool):
+    # Process the answer and calculate feedback
+    feedback = {
+        "is_correct": is_correct,
+        "explanation": "Detailed explanation...",
+        "next_question_available": True
+    }
+    
+    # Send real-time update to the user
+    await send_assessment_update(
+        app=app,
+        assessment_id=session_id,
+        update_type="answer_feedback",
+        data=feedback
+    )
+```
+
+## Integration Between Components
+
+These three infrastructure components work together to provide a seamless and responsive experience:
+
+### Database and Metrics Integration
+
+The Metrics Module depends on the Database Module for data persistence:
+
+1. **Connection Sharing**:
+   - Metrics repository uses the same connection pool as other components
+   - Leverages the database module's transaction management
+   - Benefits from connection pooling and optimization
+
+2. **Transaction Coordination**:
+   - Metrics updates participate in database transactions
+   - Consistent state across related data changes
+   - Atomic updates to prevent partial metric changes
+
+### Metrics and Realtime Integration
+
+The Metrics Module provides data that drives real-time updates:
+
+1. **Performance Updates**:
+   - When metrics are updated, real-time notifications can be triggered
+   - Achievement unlocks based on metric thresholds
+   - Leaderboard position changes communicated in real-time
+
+2. **Progress Visualization**:
+   - Metrics data is pushed through WebSockets for live dashboards
+   - Real-time progress tracking during assessment sessions
+   - Visual feedback based on performance metrics
+
+### Realtime and Assessment Integration
+
+The Realtime Module enhances the assessment experience:
+
+1. **Live Feedback**:
+   - Immediate feedback on answer submission
+   - Real-time scoring updates
+   - Timer synchronization and notifications
+
+2. **Interactive Elements**:
+   - Live hints and guidance during assessments
+   - Dynamic difficulty adjustments communicated in real-time
+   - Interactive leaderboards that update as scores change
+
+### Full System Flow Example
+
+Here's how these components work together in a typical assessment scenario:
+
+1. User completes an assessment question:
+   - Assessment service evaluates the answer
+   - Result is stored in the database using the database module
+   - Metrics service updates the user's performance metrics
+   - Realtime module sends immediate feedback to the user's browser
+
+2. User completes an entire assessment:
+   - Assessment service marks the session as complete
+   - Database transaction commits all changes
+   - Metrics service calculates and updates aggregate statistics
+   - Realtime module notifies the user of completion and final score
+   - Leaderboard is updated in real-time for all connected users
+
+3. System generates recommendations:
+   - Based on metrics data, generates personalized recommendations
+   - Stores recommendations in the database
+   - Pushes recommendations to the user via WebSocket
+   - Updates dashboard in real-time with new learning paths
+
+## Conclusion
+
+These three infrastructure components form the backbone of TradeIQ's robustness, performance, and interactivity:
+
+- The **Database Module** provides reliable data persistence with optimized async access
+- The **Metrics Module** tracks and analyzes user performance for insights and personalization
+- The **Realtime Module** enables immediate feedback and interactive experiences
+
+Together, they create a foundation that supports the assessment-specific business logic while ensuring the platform is responsive, scalable, and engaging for users. Each component is designed with clean abstractions, proper error handling, and performance optimization in mind, making TradeIQ not just feature-rich but also technically robust.

@@ -1,0 +1,569 @@
+[
+  {
+    "pattern": "DOJI",
+    "name": "Doji",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about DOJI pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "HAMMER",
+    "name": "Hammer",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about HAMMER pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "INVERTED_HAMMER",
+    "name": "Inverted Hammer",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about INVERTED_HAMMER pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "HANGING_MAN",
+    "name": "Hanging Man",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about HANGING_MAN pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "SHOOTING_STAR",
+    "name": "Shooting Star",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about SHOOTING_STAR pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "SPINNING_TOP",
+    "name": "Spinning Top",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about SPINNING_TOP pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "MARUBOZU",
+    "name": "Marubozu",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about MARUBOZU pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "BULLISH_ENGULFING",
+    "name": "Bullish Engulfing",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about BULLISH_ENGULFING pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "BEARISH_ENGULFING",
+    "name": "Bearish Engulfing",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about BEARISH_ENGULFING pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "TWEEZER_TOP",
+    "name": "Tweezer Top",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about TWEEZER_TOP pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "TWEEZER_BOTTOM",
+    "name": "Tweezer Bottom",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about TWEEZER_BOTTOM pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "PIERCING_LINE",
+    "name": "Piercing Line",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about PIERCING_LINE pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "DARK_CLOUD_COVER",
+    "name": "Dark Cloud Cover",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about DARK_CLOUD_COVER pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "MORNING_STAR",
+    "name": "Morning Star",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about MORNING_STAR pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "EVENING_STAR",
+    "name": "Evening Star",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about EVENING_STAR pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "THREE_WHITE_SOLDIERS",
+    "name": "Three White Soldiers",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about THREE_WHITE_SOLDIERS pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "THREE_BLACK_CROWS",
+    "name": "Three Black Crows",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about THREE_BLACK_CROWS pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "THREE_INSIDE_UP",
+    "name": "Three Inside Up",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about THREE_INSIDE_UP pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "THREE_INSIDE_DOWN",
+    "name": "Three Inside Down",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about THREE_INSIDE_DOWN pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "HEAD_AND_SHOULDERS",
+    "name": "Head And Shoulders",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about HEAD_AND_SHOULDERS pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "INVERSE_HEAD_AND_SHOULDERS",
+    "name": "Inverse Head And Shoulders",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about INVERSE_HEAD_AND_SHOULDERS pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "DOUBLE_TOP",
+    "name": "Double Top",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about DOUBLE_TOP pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "DOUBLE_BOTTOM",
+    "name": "Double Bottom",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about DOUBLE_BOTTOM pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "TRIANGLE",
+    "name": "Triangle",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about TRIANGLE pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "WEDGE",
+    "name": "Wedge",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about WEDGE pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "FLAG",
+    "name": "Flag",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about FLAG pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  },
+  {
+    "pattern": "PENNANT",
+    "name": "Pennant",
+    "type": "Candlestick Pattern",
+    "description": {
+      "intermediate": "Information about PENNANT pattern."
+    },
+    "formation": {
+      "intermediate": "Forms under specific market conditions."
+    },
+    "psychology": {
+      "intermediate": "Represents a specific market sentiment."
+    },
+    "signal_type": "Neutral",
+    "reliability": "Medium",
+    "time_frame": "All time frames",
+    "examples": [],
+    "related_patterns": [],
+    "market_statistics": {},
+    "visual_characteristics": {}
+  }
+]

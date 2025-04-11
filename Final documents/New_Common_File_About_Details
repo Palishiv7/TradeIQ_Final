@@ -1,0 +1,658 @@
+# TradeIQ Common Infrastructure
+
+## Overview
+
+The TradeIQ assessment platform is built with a modular, layered architecture that follows domain-driven design principles. The `backend/common` directory serves as the foundational infrastructure layer that supports all assessment types and features of the platform. It provides a comprehensive set of utilities, base classes, and services that ensure consistency, performance, and maintainability across the entire application.
+
+This document provides a detailed explanation of all components within the common infrastructure to help new developers understand the system architecture and design patterns.
+
+## Directory Structure
+
+```
+backend/common/
+├── __init__.py              # Package exports and initialization
+├── ai_engine.py            # ML model management and inference
+├── assessment_repository.py # Base repository interfaces for assessments (deprecated)
+├── assessment_service.py   # Base service interfaces for assessments (deprecated)
+├── base_assessment.py      # Base models for assessments (deprecated)
+├── cache/                  # Caching infrastructure
+│   ├── __init__.py         # Cache package exports
+│   ├── backend.py          # Abstract cache backend interface
+│   ├── base.py             # Base cache implementation
+│   ├── entry.py            # Cache entry model
+│   ├── key_builder.py      # Cache key generation utilities
+│   ├── manager.py          # Hierarchical cache manager
+│   ├── memory.py           # In-memory cache implementation
+│   ├── redis.py            # Redis cache implementation
+│   └── service.py          # Cache service interface
+├── config.py               # Configuration management
+├── db/                     # Database utilities
+│   ├── __init__.py         # Database package exports
+│   └── connection.py       # Database connection management
+├── error_handling.py       # Error handling framework
+├── finance/                # Financial data models
+│   ├── __init__.py         # Finance package exports
+│   ├── candlestick.py      # Candlestick data models
+│   ├── indicators.py       # Technical indicators
+│   ├── market.py           # Market and asset models
+│   └── patterns.py         # Candlestick pattern models
+├── gamification/           # Gamification components
+├── init.py                 # Application initialization
+├── logger.py               # Logging infrastructure
+├── metrics.py              # Metrics collection
+├── performance/            # Performance tracking
+│   ├── __init__.py         # Performance package exports
+│   ├── difficulty.py       # Adaptive difficulty management
+│   ├── forgetting.py       # Forgetting curve model
+│   ├── repository.py       # Performance data repository
+│   └── tracker.py          # User performance tracking
+├── rate_limiter.py         # API rate limiting
+├── serialization.py        # Object serialization
+├── tasks/                  # Background task management
+│   ├── __init__.py         # Tasks package exports
+│   ├── config.py           # Task configuration
+│   ├── predefined.py       # Predefined task definitions
+│   ├── registry.py         # Task registration and discovery
+│   ├── scheduler.py        # Task scheduling
+│   └── worker.py           # Task worker implementation
+├── threading.py            # Thread pool and concurrency utilities
+└── validation.py           # Input validation framework
+```
+
+## Core Components
+
+### 1. Serialization (`serialization.py`)
+
+The serialization module provides utilities for converting objects to and from JSON and dictionary formats, with support for various data types including datetime objects and enums.
+
+#### Key Features:
+- `SerializableMixin`: A mixin class that adds serialization capabilities to any class
+- Support for various serialization formats (JSON, dict)
+- Handling of complex types like datetime, enums, and nested objects
+- Field exclusion and customization
+
+#### Usage Example:
+```python
+class MyModel(SerializableMixin):
+    __serializable_fields__ = ["id", "name", "created_at"]
+    
+    def __init__(self, id, name, created_at):
+        self.id = id
+        self.name = name
+        self.created_at = created_at
+
+# Serialize to dictionary
+data_dict = my_model.to_dict()
+
+# Serialize to JSON
+json_data = my_model.to_json()
+
+# Deserialize from dictionary
+new_model = MyModel.from_dict(data_dict)
+```
+
+### 2. Configuration (`config.py`)
+
+The configuration system provides a unified way to manage application settings from multiple sources with type validation and environment variable support.
+
+#### Key Features:
+- Hierarchical configuration with Pydantic models
+- Loading from environment variables, config files, and defaults
+- Type validation and conversion
+- Environment-specific configurations
+
+#### Configuration Models:
+- `DatabaseConfig`: Database connection settings
+- `RedisConfig`: Redis connection settings
+- `ThreadPoolConfig`: Thread pool settings
+- `CacheConfig`: Caching settings
+- `LoggingConfig`: Logging settings
+- `SecurityConfig`: Security and authentication settings
+- `APIConfig`: API server settings
+- `AssessmentConfig`: Assessment-specific settings
+- `AIConfig`: AI model settings
+- `EnvironmentConfig`: Environment settings
+- `AppConfig`: Main application configuration
+
+### 3. Caching (`cache/`)
+
+The caching system provides a flexible and efficient way to cache data with support for multiple backends and complex invalidation strategies.
+
+#### Key Components:
+- `CacheBackend`: Abstract interface for cache backends
+- `MemoryCache`: In-memory implementation with optional LRU eviction
+- `RedisCache`: Redis-based distributed cache
+- `CacheManager`: Hierarchical cache manager for multiple backend coordination
+- `CacheEntry`: Container for cached data with metadata
+- `KeyBuilder`: Utilities for building consistent cache keys
+
+#### Features:
+- TTL (Time-To-Live) support
+- Multiple backend coordination
+- Write-through and write-back policies
+- Atomic operations
+- Hierarchical caching with fallbacks
+- Batch operations
+
+#### Usage Example:
+```python
+# Get the cache manager singleton
+cache_manager = get_cache_manager()
+
+# Basic cache operations
+cache_manager.set("user:123", user_data, ttl=3600)
+result = cache_manager.get("user:123")
+
+# Using key builder
+key = KeyBuilder().add("user").add(user_id).build()
+cache_manager.set(key, user_data)
+```
+
+### 4. Threading and Concurrency (`threading.py`)
+
+The threading module provides a sophisticated thread pool implementation for optimal handling of concurrent tasks.
+
+#### Key Features:
+- Adaptive thread management based on system resources
+- Priority-based task scheduling
+- Performance monitoring and metrics collection
+- Task cancellation and timeout management
+- Backpressure handling for stability
+
+#### Components:
+- `ThreadPoolService`: Central thread pool manager
+- `Task`: Encapsulates a task with metadata
+- `TaskPriority`: Priority levels for scheduling
+- Thread pool context manager for resource management
+
+#### Usage Example:
+```python
+# Get the thread pool service singleton
+thread_pool = ThreadPoolService()
+
+# Submit a task with priority
+future = thread_pool.submit(
+    function, arg1, arg2,
+    priority=TaskPriority.HIGH,
+    timeout=30
+)
+
+# Wait for result
+result = future.result()
+
+# Using the decorator
+@async_task(priority=TaskPriority.HIGH, timeout=60)
+def my_background_task(param1, param2):
+    # Long-running operation
+    return result
+```
+
+### 5. Error Handling (`error_handling.py`)
+
+The error handling framework provides a comprehensive set of exception classes and utilities for consistent error reporting and handling.
+
+#### Key Features:
+- Hierarchical exception classes
+- Structured error information with metadata
+- JSON serialization for API responses
+- Retry mechanisms with backoff
+- Structured logging integration
+
+#### Main Exception Classes:
+- `TradeIQError`: Base exception for all application errors
+- `ValidationError`: For input validation failures
+- `AuthenticationError`: For authentication issues
+- `AuthorizationError`: For permission issues
+- `ResourceNotFoundError`: For missing resources
+- `ServiceError`: For service-level failures
+- `DatabaseError`: For database-related issues
+- `ExternalServiceError`: For third-party service issues
+
+#### Usage Example:
+```python
+try:
+    # Operation that might fail
+    result = process_data(input_data)
+except ValidationError as e:
+    # Handle validation error
+    error_response = e.to_dict()
+    return JSONResponse(status_code=400, content=error_response)
+except ResourceNotFoundError as e:
+    # Handle not found error
+    error_response = e.to_dict()
+    return JSONResponse(status_code=404, content=error_response)
+```
+
+### 6. Logging (`logger.py`)
+
+The logging module provides a consistent logging interface with configurable formatters and handlers.
+
+#### Key Features:
+- JSON formatting for structured logging
+- Contextual logging with additional metadata
+- Log level configuration
+- File and console output
+- Integration with external logging systems
+
+#### Components:
+- `JsonFormatter`: Formatter that outputs JSON for log aggregation
+- `LoggerAdapter`: Adds contextual information to log records
+- Configuration utilities for consistent logger setup
+
+#### Usage Example:
+```python
+# Get the application logger
+logger = app_logger.getChild("my_module")
+
+# Basic logging
+logger.info("Processing started")
+logger.error("Error occurred", exc_info=True)
+
+# Contextual logging
+context = {"user_id": "123", "request_id": "abc-123"}
+logger_with_context = LoggerAdapter(logger, context)
+logger_with_context.info("User action performed")
+```
+
+### 7. Validation (`validation.py`)
+
+The validation framework provides utilities for validating input data with detailed error reporting.
+
+#### Key Features:
+- Schema-based validation using Pydantic
+- Schema registry for centralized validation rule management
+- Support for partial validation
+- Detailed error reporting
+- Integration with FastAPI for request validation
+
+#### Components:
+- `ValidationResult`: Result of a validation operation
+- `SchemaRegistry`: Registry for validation schemas
+- Decorators for easy validation in API endpoints
+
+#### Usage Example:
+```python
+# Define a validation schema
+class UserCreateSchema(BaseModel):
+    username: str
+    email: str
+    password: str
+
+# Register the schema
+schema_registry = SchemaRegistry()
+schema_registry.register("user_create", UserCreateSchema)
+
+# Validate data
+data = {"username": "john", "email": "john@example.com", "password": "secret"}
+result = schema_registry.validate("user_create", data)
+
+if result.is_valid:
+    # Use validated data
+    validated_data = result.validated_data
+    create_user(validated_data)
+else:
+    # Handle validation errors
+    errors = result.errors
+```
+
+### 8. Task Management (`tasks/`)
+
+The task management system provides a framework for registering, scheduling, and executing background tasks.
+
+#### Key Components:
+- `TaskRegistry`: Central registry for task registration and discovery
+- `TaskDefinition`: Encapsulates a task with metadata
+- `task` decorator: For easy task registration
+- Integration with Celery for distributed task execution
+
+#### Features:
+- Task registration and discovery
+- Scheduled and recurring tasks
+- Task prioritization
+- Retry mechanisms with backoff
+- Task monitoring and metrics
+
+#### Usage Example:
+```python
+from backend.common.tasks.registry import task
+
+@task(
+    queue="assessments",
+    retry=True,
+    max_retries=3,
+    retry_delay=5
+)
+async def generate_assessment(user_id: str, assessment_type: str):
+    # Task implementation
+    pass
+
+# Execute the task
+result = await generate_assessment.delay(user_id="123", assessment_type="candlestick")
+```
+
+### 9. AI Engine (`ai_engine.py`)
+
+The AI engine provides a framework for managing and using machine learning models with consistent interfaces.
+
+#### Key Features:
+- Model versioning and tracking
+- Inference pipeline with preprocessing and postprocessing
+- Model registry for centralized access
+- Performance monitoring
+
+#### Components:
+- `BaseModel`: Abstract base class for ML models
+- `ModelRegistry`: Registry for managing models
+- `ModelVersion`: Semantic versioning for models
+- `InferenceResult`: Container for inference results with metadata
+
+#### Usage Example:
+```python
+# Get the model registry
+registry = ModelRegistry()
+
+# Get a model
+model = registry.get_model("pattern_recognition_v1")
+
+# Run inference
+preprocessed = model.preprocess(input_data)
+raw_output = model.predict(preprocessed)
+result = model.postprocess(raw_output)
+
+# Or use the combined pipeline
+result, metrics = model.infer(input_data)
+```
+
+### 10. Rate Limiting (`rate_limiter.py`)
+
+The rate limiter protects the system from excessive requests and ensures fair resource allocation.
+
+#### Key Features:
+- Redis-based distributed rate limiting
+- In-memory fallback
+- Configurable limits and windows
+- FastAPI integration
+- Response headers for client feedback
+
+#### Usage Example:
+```python
+# Initialize rate limiter
+limiter = RateLimiter(redis_client)
+
+@app.get("/api/resource")
+async def get_resource(allowed: bool = Depends(
+    limiter.rate_limit_dependency(10, 60, key_func=get_client_ip)
+)):
+    # This endpoint is protected by rate limiting
+    return {"data": "resource data"}
+```
+
+### 11. Finance Models (`finance/`)
+
+The finance module provides data models and utilities for financial market data and analysis.
+
+#### Key Components:
+- `candlestick.py`: Models for candlestick chart data
+- `patterns.py`: Candlestick pattern definitions and detection
+- `market.py`: Models for assets, markets, and trading pairs
+- `indicators.py`: Technical indicators for market analysis
+
+#### Features:
+- Comprehensive candlestick pattern definitions
+- Pattern recognition algorithms
+- Technical indicator calculations
+- Asset and market data models
+
+#### Usage Example:
+```python
+# Create a candlestick
+candle = Candlestick(
+    timestamp=datetime.now(),
+    open=100.0,
+    high=105.0,
+    low=98.0,
+    close=103.0,
+    volume=1000
+)
+
+# Check properties
+if candle.is_bullish:
+    print("Bullish candle")
+
+# Detect patterns
+detector = PatternDetector()
+patterns = detector.detect_patterns(candle_series)
+```
+
+### 12. Performance Tracking (`performance/`)
+
+The performance module provides components for tracking user performance and adapting difficulty levels.
+
+#### Key Components:
+- `difficulty.py`: Adaptive difficulty management
+- `forgetting.py`: Forgetting curve model for spaced repetition
+- `tracker.py`: User performance tracking across topics
+- `repository.py`: Data access for performance metrics
+
+#### Features:
+- Adaptive difficulty based on user performance
+- Spaced repetition scheduling
+- Comprehensive performance metrics
+- Skill level assessment
+
+#### Usage Example:
+```python
+# Initialize performance tracker
+performance_tracker = UserPerformanceTracker(user_id="123")
+
+# Record an assessment result
+performance_tracker.record_assessment_result(
+    assessment_type="candlestick",
+    score=85,
+    topics=["bullish_patterns", "bearish_patterns"],
+    difficulty=0.7
+)
+
+# Get difficulty recommendation
+topic = "bullish_patterns"
+recommended_difficulty = performance_tracker.get_recommended_difficulty(topic)
+```
+
+### 13. Metrics (`metrics.py`)
+
+The metrics module provides a lightweight system for tracking application metrics.
+
+#### Key Features:
+- Support for counters, gauges, histograms, and timers
+- Multiple backend support
+- Tagging and labeling
+- Timer decorators and context managers
+
+#### Usage Example:
+```python
+# Get metrics instance
+metrics = MetricsService.get_instance()
+
+# Increment a counter
+metrics.increment_counter("api_requests", labels={"endpoint": "/api/assessments"})
+
+# Time an operation
+with metrics.timer("database_query", labels={"query_type": "select"}):
+    # Database operation
+    result = await db.fetch_all(query)
+
+# Using a decorator
+@metrics.timed("process_assessment", labels={"type": "candlestick"})
+async def process_assessment(assessment_id):
+    # Processing logic
+    pass
+```
+
+## Base Assessment Framework
+
+The base assessment framework defines common models and services for all assessment types. Note that some components are being migrated from `backend/common/base_assessment.py` to `backend/assessments/base/models.py`.
+
+### Key Models:
+- `BaseQuestion`: Base class for all assessment questions
+- `AnswerEvaluation`: Represents the evaluation of a user's answer
+- `AssessmentSession`: Represents a user's assessment session
+- `AssessmentType`: Enum for different assessment types
+- `QuestionDifficulty`: Enum for difficulty levels
+- `SessionStatus`: Enum for session states
+- `DomainEvent`: Base class for domain events
+
+### Key Services:
+- `BaseAssessmentService`: Interface for assessment services
+- `BaseSessionRepository`: Interface for session data access
+- `BaseQuestionRepository`: Interface for question data access
+
+## Database Infrastructure (`db/`)
+
+The database module provides utilities for managing database connections and operations.
+
+#### Key Features:
+- Connection pooling and management
+- Environment-based configuration
+- Support for different database types
+- Connection string generation
+
+#### Usage Example:
+```python
+# Get database settings
+db_settings = get_database_settings()
+
+# Create a database engine
+engine = create_async_engine(
+    db_settings["database_url"],
+    pool_size=db_settings["pool_size"],
+    max_overflow=10
+)
+```
+
+## Design Patterns
+
+The common infrastructure implements several design patterns:
+
+### 1. Singleton Pattern
+Used for services that should have only one instance, such as:
+- `ThreadPoolService`
+- `CacheManager`
+- `MetricsService`
+- `ModelRegistry`
+
+### 2. Repository Pattern
+For data access abstraction:
+- `BaseSessionRepository`
+- `BaseQuestionRepository`
+- `PerformanceRepository`
+
+### 3. Factory Pattern
+For creating objects:
+- `get_cache_service()`
+- `configure_logger()`
+
+### 4. Strategy Pattern
+For different implementations of the same interface:
+- `CacheBackend` implementations
+- `MetricsBackend` implementations
+
+### 5. Adapter Pattern
+For interfacing with external systems:
+- `LoggerAdapter`
+
+### 6. Observer Pattern
+For event handling:
+- `EventDispatcher` and domain events
+
+### 7. Decorator Pattern
+For adding functionality to existing code:
+- `@task` decorator
+- `@async_task` decorator
+- `@metrics.timed` decorator
+
+## Threading and Concurrency Model
+
+TradeIQ uses a sophisticated threading and concurrency model for handling parallel operations efficiently:
+
+### Thread Pool
+- Centralized `ThreadPoolService` for managing thread resources
+- Adaptive sizing based on system load and queue depth
+- Priority-based scheduling for optimal resource utilization
+- Task timeout management and cancellation
+- Performance monitoring and metrics
+
+### Async Support
+- Integration with asyncio for async/await patterns
+- Bridge between async code and thread-based operations
+- Utilities for running blocking code in thread pools from async code
+
+### Best Practices
+- Task isolation for proper error handling
+- Resource management with context managers
+- Backpressure handling to prevent system overload
+- Monitoring and metrics for performance tuning
+
+## Caching Strategy
+
+The caching strategy is designed to optimize performance while ensuring data consistency:
+
+### Multi-Level Caching
+- L1: In-memory cache for fastest access
+- L2: Redis for distributed and persistent caching
+- Fallback mechanisms when a cache level is unavailable
+
+### Cache Policies
+- TTL (Time-To-Live) for automatic expiration
+- LRU (Least Recently Used) for memory management
+- Write-through and write-back strategies
+
+### Specialized Caches
+- Question cache for assessment questions
+- User performance cache for adaptive difficulty
+- Pattern recognition results cache
+- Session data cache
+
+## Error Handling Strategy
+
+The error handling strategy ensures consistent error reporting and recovery:
+
+### Exception Hierarchy
+- Base `TradeIQError` for all application exceptions
+- Specialized exceptions for different error types
+- Structured error information with metadata
+
+### Recovery Mechanisms
+- Retry with exponential backoff for transient failures
+- Fallback strategies for critical operations
+- Circuit breakers for external services
+
+### Error Reporting
+- Structured error logging
+- Error aggregation for monitoring
+- Detailed error responses for APIs
+
+## Initialization and Bootstrapping
+
+The application initialization process follows a specific order:
+
+1. Load configuration from environment and files
+2. Configure logging system
+3. Initialize database connections
+4. Start caching services
+5. Initialize thread pool
+6. Register task handlers
+7. Start metrics collection
+8. Initialize AI models
+9. Register API routes
+
+## Conclusion
+
+The TradeIQ common infrastructure provides a robust foundation for building assessment features with:
+
+- Consistent patterns and practices
+- Performance optimization through caching and concurrency
+- Comprehensive error handling and logging
+- Flexible configuration and environment support
+- Modular and maintainable architecture
+
+This infrastructure enables rapid development of new assessment types and features while ensuring reliability, performance, and consistency across the platform.
